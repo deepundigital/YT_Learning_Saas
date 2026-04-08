@@ -1,0 +1,14 @@
+const express = require("express");
+const router = express.Router();
+
+const {
+  generateVideoSummary,
+  generateVideoFlashcards,
+} = require("../controllers/aiController");
+
+const authMiddleware = require("../middlewares/authMiddleware");
+
+router.post("/summary/:youtubeId", authMiddleware, generateVideoSummary);
+router.post("/flashcards/:youtubeId", authMiddleware, generateVideoFlashcards);
+
+module.exports = router;

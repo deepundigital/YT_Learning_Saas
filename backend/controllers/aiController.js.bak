@@ -1,0 +1,149 @@
+const Video = require("../models/Video");
+const { generateSummary, generateFlashcards } = require("../services/aiService");
+const { getTranscript } = require("../services/transcriptService");
+
+async function getOrCreateVideo(youtubeId) {
+  let video = await Video.findOne({ youtubeId });
+
+  if (!video) {
+    video = await Video.create({ youtubeId });
+  }
+
+  return video;
+}
+
+async function ensureTranscript(video, forceRefresh = false) {
+  if (video.transcriptText && !forceRefresh) {
+    return {
+      transcriptText: video.transcriptText,
+      transcriptSource: video.transcriptSource || "database",
+      fetchedFresh: false,
+    };
+  }
+
+  const transcriptResult = await getTranscript(video.youtubeId);
+
+  if (transcriptResult.ok && transcriptResult.transcriptText) {
+    video.transcriptText = transcriptResult.transcriptText;
+    video.transcriptSource = transcriptResult.source;
+    video.transcriptFetchedAt = new Date();
+    await video.save();
+
+    return {
+      transcriptText: video.transcriptText,
+      transcriptSource: video.transcriptSource,
+      fetchedFresh: true,
+    };
+  }
+
+  return {
+    transcriptText: "",
+    transcriptSource: transcriptResult.source || "unavailable",
+    fetchedFresh: false,
+  };
+}
+
+exports.generateVideoSummary = async (req, res) => {
+  try {
+    const { youtubeId } = req.params;
+    const forceRefresh = req.query.forceRefresh === "true";
+
+    const video = await getOrCreateVideo(youtubeId);
+
+    if (video.aiSummary && !forceRefresh) {
+      return res.status(200).json({
+        ok: true,
+        source: video.aiSummarySource || "database",
+        cacheHit: true,
+        transcriptUsed: !!video.transcriptText,
+        summary: video.aiSummary,
+      });
+    }
+
+    const transcriptData = await ensureTranscript(video, forceRefresh);
+
+    const summary = await generateSummary({
+      title: video.title,
+      description: video.description,
+      transcriptText: transcriptData.transcriptText,
+    });
+
+    video.aiSummary = summary;
+    video.aiSummarySource = transcriptData.transcriptText
+      ? "transcript-based"
+      : "metadata-only";
+    video.aiSummaryUpdatedAt = new Date();
+    await video.save();
+
+    return res.status(200).json({
+      ok: true,
+      source: video.aiSummarySource,
+      cacheHit: false,
+      transcriptUsed: !!transcriptData.transcriptText,
+      transcriptSource: transcriptData.transcriptSource,
+      summary,
+    });
+  } catch (error) {
+    console.error("generateVideoSummary error:", error.message);
+    return res.status(500).json({
+      ok: false,
+      message: "Failed to generate summary",
+      error: error.message,
+    });
+  }
+};
+
+exports.generateVideoFlashcards = async (req, res) => {
+  try {
+    const { youtubeId } = req.params;
+    const forceRefresh = req.query.forceRefresh === "true";
+    const count = Number(req.body?.count || 8);
+
+    const video = await getOrCreateVideo(youtubeId);
+
+    if (
+      Array.isArray(video.flashcards) &&
+      video.flashcards.length > 0 &&
+      !forceRefresh
+    ) {
+      return res.status(200).json({
+        ok: true,
+        source: "database",
+        cacheHit: true,
+        transcriptUsed: !!video.transcriptText,
+        flashcards: video.flashcards,
+      });
+    }
+
+    const transcriptData = await ensureTranscript(video, forceRefresh);
+
+    const flashcards = await generateFlashcards({
+      title: video.title,
+      description: video.description,
+      transcriptText: transcriptData.transcriptText,
+      count,
+    });
+
+    video.flashcards = flashcards;
+    video.flashcardsUpdatedAt = new Date();
+    await video.save();
+
+    return res.status(200).json({
+      ok: true,
+      source: transcriptData.transcriptText
+        ? "transcript-based"
+        : "metadata-only",
+      cacheHit: false,
+      transcriptUsed: !!transcriptData.transcriptText,
+      transcriptSource: transcriptData.transcriptSource,
+      flashcards,
+    });
+  } catch (error) {
+    console.error("generateVideoFlashcards error:", error.message);
+    return res.status(500).json({
+      ok: false,
+      message: "Failed to generate flashcards",
+      error: error.message,
+    });
+  }
+};
