@@ -10,12 +10,12 @@ export async function createCertificate(payload) {
   return data;
 }
 
-export async function verifyCertificate(certificateId) {
-  const { data } = await api.get(`/certificates/verify/${certificateId}`);
+export async function deleteCertificate(certificateId) {
+  const { data } = await api.delete(`/certificates/${certificateId}`);
   return data;
 }
 
-export async function deleteCertificate(certificateId) {
-  const { data } = await api.delete(`/certificates/${certificateId}`);
+export async function verifyCertificate(certificateId) {
+  const { data } = await api.get(`/certificates/verify/${certificateId}`);
   return data;
 }

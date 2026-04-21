@@ -11,10 +11,10 @@ import {
   Flame,
   ListVideo,
   Plus,
-  Sparkles,
   Target,
   Trash2,
   Trophy,
+  Copy,
 } from "lucide-react";
 
 import Button from "../components/common/Button";
@@ -27,6 +27,11 @@ import {
   updateStudyGoal,
   deleteStudyGoal,
 } from "../services/plannerService";
+import {
+  getCertificates,
+  createCertificate,
+  deleteCertificate,
+} from "../services/certificateService";
 
 function formatDuration(seconds = 0) {
   const total = Math.max(0, Number(seconds) || 0);
@@ -215,6 +220,10 @@ export default function PlaylistsPage() {
   const [goals, setGoals] = useState([]);
   const [goalsLoading, setGoalsLoading] = useState(false);
 
+  const [certificates, setCertificates] = useState([]);
+  const [certificatesLoading, setCertificatesLoading] = useState(false);
+  const [issuingCertificateId, setIssuingCertificateId] = useState("");
+
   const [goalTitle, setGoalTitle] = useState("");
   const [goalDescription, setGoalDescription] = useState("");
   const [goalDailyMinutes, setGoalDailyMinutes] = useState(30);
@@ -229,29 +238,35 @@ export default function PlaylistsPage() {
     try {
       setLoading(true);
       setGoalsLoading(true);
+      setCertificatesLoading(true);
 
-      const [playlistsRes, progressRes, analyticsRes, goalsRes] = await Promise.all([
-        getPlaylists(),
-        getAllProgress(),
-        getDashboardAnalytics(),
-        getStudyGoals(),
-      ]);
+      const [playlistsRes, progressRes, analyticsRes, goalsRes, certificatesRes] =
+        await Promise.all([
+          getPlaylists(),
+          getAllProgress(),
+          getDashboardAnalytics(),
+          getStudyGoals(),
+          getCertificates(),
+        ]);
 
       setPlaylists(playlistsRes?.playlists || []);
       setProgressItems(progressRes?.progress || []);
       setDashboardStats(analyticsRes?.stats || {});
       setGoals(goalsRes?.goals || []);
+      setCertificates(certificatesRes?.certificates || []);
       setQuizAttempts(getLocalQuizAttempts());
     } catch (error) {
-      console.error("Tracker page load error:", error);
+      console.error("Progress page load error:", error);
       setPlaylists([]);
       setProgressItems([]);
       setDashboardStats({});
       setGoals([]);
+      setCertificates([]);
       setQuizAttempts(getLocalQuizAttempts());
     } finally {
       setLoading(false);
       setGoalsLoading(false);
+      setCertificatesLoading(false);
     }
   };
 
@@ -430,16 +445,74 @@ export default function PlaylistsPage() {
   }, [quizAttempts]);
 
   const sortedGoals = useMemo(() => {
-    return [...goals].sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
+    return [...goals].sort(
+      (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
+    );
   }, [goals]);
+
+  const getCertificateForPlaylist = (playlist) => {
+    return (
+      certificates.find(
+        (cert) =>
+          cert?.type === "platform" &&
+          (cert?.metadata?.playlistId === playlist._id ||
+            cert?.courseName === playlist.name)
+      ) || null
+    );
+  };
+
+  const handleIssueCertificate = async (playlist) => {
+    try {
+      setIssuingCertificateId(playlist._id);
+
+      const existing = getCertificateForPlaylist(playlist);
+      if (existing) return;
+
+      await createCertificate({
+        title: `${playlist.name} Completion Certificate`,
+        platform: "Interactive Learning Platform",
+        type: "platform",
+        courseName: playlist.name,
+        issuedBy: "Interactive Learning Platform",
+        completionDate: new Date().toISOString(),
+        metadata: {
+          playlistId: playlist._id,
+          playlistName: playlist.name,
+        },
+      });
+
+      await loadPage();
+    } catch (error) {
+      console.error("Issue certificate error:", error);
+    } finally {
+      setIssuingCertificateId("");
+    }
+  };
+
+  const handleDeleteCertificate = async (certificateId) => {
+    try {
+      await deleteCertificate(certificateId);
+      await loadPage();
+    } catch (error) {
+      console.error("Delete certificate error:", error);
+    }
+  };
+
+  const copyCertificateId = async (certificateId) => {
+    try {
+      await navigator.clipboard.writeText(certificateId);
+    } catch (error) {
+      console.error("Copy certificate id error:", error);
+    }
+  };
 
   return (
     <div className="min-h-screen text-[var(--text)]">
       <div className="section-container py-6 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm text-muted">Progress Overview</p>
-            <h1 className="text-2xl font-bold md:text-3xl">Tracker</h1>
+            <p className="text-sm text-muted">Learning Progress</p>
+            <h1 className="text-2xl font-bold md:text-3xl">Progress</h1>
           </div>
 
           <div className="flex gap-3">
@@ -450,7 +523,7 @@ export default function PlaylistsPage() {
           </div>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4)">
           <StatCard
             icon={ListVideo}
             title="Playlists"
@@ -487,7 +560,7 @@ export default function PlaylistsPage() {
             subtitle="Track completion, resume learning, and identify weak areas"
             right={
               <div className="rounded-full bg-blue-500/10 px-3 py-1 text-xs text-blue-300">
-                Tracker Mode
+                Progress Mode
               </div>
             }
           >
@@ -610,22 +683,6 @@ export default function PlaylistsPage() {
                         </p>
                       )}
                     </div>
-
-                    {playlist.isCompleted ? (
-                      <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                        <div className="flex items-center gap-3">
-                          <Award size={18} className="text-emerald-300" />
-                          <div>
-                            <p className="font-medium text-emerald-300">
-                              Certificate eligible
-                            </p>
-                            <p className="text-sm text-emerald-200/80">
-                              This playlist is complete and ready for certificate flow.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
                   </motion.div>
                 ))
               ) : (
@@ -849,35 +906,137 @@ export default function PlaylistsPage() {
             </SectionCard>
 
             <SectionCard
-              title="Certificate Readiness"
-              subtitle="Completed playlists that can unlock completion proof"
+              title="Certificates"
+              subtitle="Issue and manage real completion certificates"
             >
               <div className="space-y-3">
                 {playlistTrackers.filter((item) => item.isCompleted).length ? (
                   playlistTrackers
                     .filter((item) => item.isCompleted)
-                    .map((item) => (
-                      <div
-                        key={`cert-${item._id}`}
-                        className="rounded-[1.25rem] border border-emerald-500/20 bg-emerald-500/10 p-4"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-300">
-                            <BookOpenCheck size={16} />
+                    .map((item) => {
+                      const existingCertificate = getCertificateForPlaylist(item);
+
+                      return (
+                        <div
+                          key={`cert-${item._id}`}
+                          className="rounded-[1.25rem] border border-emerald-500/20 bg-emerald-500/10 p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-300">
+                                <BookOpenCheck size={16} />
+                              </div>
+                              <div>
+                                <p className="font-medium text-emerald-300">{item.name}</p>
+                                <p className="mt-1 text-sm text-emerald-200/80">
+                                  {existingCertificate
+                                    ? `Issued • ${existingCertificate.certificateId}`
+                                    : "Playlist complete. Ready to issue certificate."}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              {existingCertificate ? (
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      copyCertificateId(existingCertificate.certificateId)
+                                    }
+                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition hover:border-white/20"
+                                  >
+                                    <span className="inline-flex items-center gap-2">
+                                      <Copy size={14} />
+                                      Copy ID
+                                    </span>
+                                  </button>
+
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteCertificate(existingCertificate._id)
+                                    }
+                                    className="rounded-xl border border-rose-500/20 px-3 py-2 text-sm text-rose-300 transition hover:border-rose-500/30"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => handleIssueCertificate(item)}
+                                  disabled={issuingCertificateId === item._id}
+                                  className="rounded-xl bg-[linear-gradient(135deg,#10b981,#059669)] px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-70"
+                                >
+                                  {issuingCertificateId === item._id
+                                    ? "Issuing..."
+                                    : "Issue Certificate"}
+                                </button>
+                              )}
+                            </div>
                           </div>
+                        </div>
+                      );
+                    })
+                ) : (
+                  <p className="text-sm text-muted">
+                    Complete a playlist to unlock certificate issuance.
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-5">
+                <p className="mb-3 text-sm font-medium">Issued Certificates</p>
+
+                {certificatesLoading ? (
+                  <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4 text-sm text-muted">
+                    Loading certificates...
+                  </div>
+                ) : certificates.length ? (
+                  <div className="space-y-3">
+                    {certificates.map((cert) => (
+                      <div
+                        key={cert._id}
+                        className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
-                            <p className="font-medium text-emerald-300">{item.name}</p>
-                            <p className="mt-1 text-sm text-emerald-200/80">
-                              Playlist fully completed. Certificate can be enabled here.
+                            <p className="font-medium">{cert.title}</p>
+                            <p className="mt-1 text-sm text-muted">
+                              {cert.courseName || cert.platform}
                             </p>
+                            <p className="mt-1 text-xs text-muted">
+                              {cert.certificateId} •{" "}
+                              {cert.completionDate
+                                ? new Date(cert.completionDate).toLocaleDateString()
+                                : "No date"}
+                            </p>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => copyCertificateId(cert.certificateId)}
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition hover:border-white/20"
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <Copy size={14} />
+                                Copy ID
+                              </span>
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteCertificate(cert._id)}
+                              className="rounded-xl border border-rose-500/20 px-3 py-2 text-sm text-rose-300 transition hover:border-rose-500/30"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
                       </div>
-                    ))
+                    ))}
+                  </div>
                 ) : (
-                  <p className="text-sm text-muted">
-                    Complete a playlist to unlock certificate readiness.
-                  </p>
+                  <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4 text-sm text-muted">
+                    No certificates issued yet.
+                  </div>
                 )}
               </div>
             </SectionCard>

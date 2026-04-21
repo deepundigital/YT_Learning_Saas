@@ -22,6 +22,7 @@ const {
 const plannerRoutes = require("./routes/planner");
 const analyticsRoutes = require("./routes/analytics");
 const revisionRoutes = require("./routes/revision");
+const certificateRoutes = require("./routes/certificates");
 
 function sanitizePlaylistId(raw) {
   if (!raw) return "";
@@ -82,6 +83,7 @@ function createApp() {
   app.use("/api/planner", plannerRoutes);
   app.use("/api/analytics", analyticsRoutes);
   app.use("/api/revision", revisionRoutes);
+  app.use("/api/certificates", certificateRoutes);
 
   
 
