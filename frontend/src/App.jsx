@@ -11,6 +11,7 @@ import AppLayout from "./layouts/AppLayout";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AssignmentSolverPage from "./pages/AssignmentSolverPage";
+import CommunityPage from "./pages/CommunityPage";
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/assignment-solver" element={<AssignmentSolverPage />} />
+          <Route path="/community" element={<CommunityPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         </Route>

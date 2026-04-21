@@ -19,6 +19,7 @@ import {
   Target,
   TrendingUp,
   Trophy,
+  Users,
   Zap,
 } from "lucide-react";
 import {
@@ -378,6 +379,12 @@ export default function DashboardPage() {
       desc: "Get step-by-step solutions for your homework.",
       onClick: () => navigate("/assignment-solver"),
     },
+    {
+      icon: Users,
+      title: "Student Community",
+      desc: "Connect with peers and chat in real-time.",
+      onClick: () => navigate("/community"),
+    },
   ];
 
   const weakTopics = useMemo(() => {
@@ -575,8 +582,8 @@ export default function DashboardPage() {
             subtitle="Tracked watch time on your latest videos"
             right={<div className="text-sm text-muted">Real activity</div>}
           >
-            <div className="h-[320px] min-h-[320px] w-full min-w-0">
-  <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={320}>
+            <div className="h-[300px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={progressChartData}>
                   <defs>
                     <linearGradient id="minutesFill" x1="0" y1="0" x2="0" y2="1">
@@ -618,7 +625,7 @@ export default function DashboardPage() {
             title="Learning distribution"
             subtitle="How your backend-tracked activity is distributed"
           >
-            <div className="h-[320px] w-full">
+            <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={distributionData}>
                   <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />

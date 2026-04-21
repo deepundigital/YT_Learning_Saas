@@ -9,6 +9,11 @@ const ChatSession = require("../models/ChatSession");
 const FlashcardSet = require("../models/FlashcardSet");
 const RevisionItem = require("../models/RevisionItem");
 const AICache = require("../models/AICache");
+const multer = require("multer");
+const pdfParse = require("pdf-parse");
+
+const upload = multer({ storage: multer.memoryStorage() });
+
 
 const { getVideoMetadata } = require("../services/youtubeService");
 const {
@@ -830,39 +835,90 @@ router.get("/quiz-attempts/:youtubeId", auth, async (req, res) => {
     });
   }
 });
-router.post("/solve-assignment", auth, async (req, res) => {
-  try {
-    const { content, instructions } = req.body;
+router.post("/solve-assignment", auth, upload.single("assignment"), async (req, res) => {
+  console.log("==== ASSIGNMENT SOLVER REQUEST ====");
+  console.log("Body:", req.body);
+  console.log("File Metadata:", req.file ? {
+    name: req.file.originalname,
+    type: req.file.mimetype,
+    size: req.file.size
+  } : "No file uploaded");
 
-    if (!content) {
+  try {
+    let content = req.body.content || "";
+    const instructions = req.body.instructions || "";
+
+    // 1. Process File if present
+    if (req.file) {
+      const mimeType = req.file.mimetype;
+      
+      if (mimeType === "application/pdf") {
+        console.log("Status: Extracting text from PDF...");
+        const pdfData = await pdfParse(req.file.buffer);
+        content = pdfData.text;
+        console.log("Success: PDF text extracted. Length:", content.length);
+      } 
+      else if (mimeType.startsWith("image/")) {
+        console.log("Status: Image detected. Using fallback OCR note.");
+        // Basic fallback as requested
+        content = `[IMAGE ANALYSIS REQUESTED: ${req.file.originalname}] Please analyze the problem visible in the attached image content.`;
+      } 
+      else if (mimeType === "text/plain") {
+        content = req.file.buffer.toString("utf-8");
+      }
+    }
+
+    // 2. Validate Input
+    if (!content.trim() && !instructions.trim()) {
+      console.warn("Validation Error: Request contains no content or instructions.");
       return res.status(400).json({
-        ok: false,
-        error: "Assignment content is required",
+        success: false,
+        message: "Failed to solve assignment",
+        error: "Please provide assignment content, a file, or specific instructions."
       });
     }
 
     const userId = getUserId(req);
 
+    // 3. AI Processing
+    console.log("Status: Sending to AI Provider...");
     const result = await solveAssignment({ content, instructions });
 
+    if (!result || !result.raw) {
+      throw new Error("Invalid AI response: Solution content is empty");
+    }
+
+    console.log("AI Response Preview:", result.raw.substring(0, 200) + "...");
+
+    // 4. Activity Logging
     await AIInteraction.create({
       user: userId,
       type: "assignment",
-      input: { instructions },
+      input: { 
+        instructions, 
+        hasFile: !!req.file,
+        fileName: req.file?.originalname,
+        contentLength: content.length 
+      },
       output: { solution: result.raw },
       source: "upload",
     });
 
+    console.log("Success: Assignment solved and logged.");
+
     return res.json({
-      ok: true,
+      success: true,
       solution: result.raw,
     });
-  } catch (err) {
-    console.error("AI assignment error:", err.response?.data || err.message);
+
+  } catch (error) {
+    console.error("Assignment Solver Error:", error);
+    console.error("Stack:", error.stack);
+    
     return res.status(500).json({
-      ok: false,
-      error: "Failed to solve assignment",
-      details: err.response?.data || err.message,
+      success: false,
+      message: "Failed to solve assignment",
+      error: error.message || "An internal error occurred while processing the assignment."
     });
   }
 });
