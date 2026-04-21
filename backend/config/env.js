@@ -2,7 +2,7 @@ require("dotenv").config();
 
 module.exports = {
   PORT: process.env.PORT || 5000,
-  MONGO_URI: process.env.MONGO_URI || "",
+MONGO_URI: process.env.MONGO_URI,
   JWT_SECRET: process.env.JWT_SECRET || "",
   YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY || "",
   AI_PROVIDER: process.env.AI_PROVIDER || "",

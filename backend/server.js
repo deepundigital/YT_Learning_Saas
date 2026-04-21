@@ -18,5 +18,9 @@ async function startServer() {
     process.exit(1);
   }
 }
+if (!env.MONGO_URI) {
+  throw new Error("MONGO_URI is NOT defined");
+}
+console.log("MONGO_URI CHECK:", process.env.MONGO_URI);
 
 startServer();
