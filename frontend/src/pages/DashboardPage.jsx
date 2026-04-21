@@ -36,6 +36,7 @@ import Button from "../components/common/Button";
 import ThemeToggle from "../components/common/ThemeToggle";
 import { getDashboardAnalytics } from "../services/analyticsService";
 import { getPlaylists } from "../services/playlistService";
+import DashboardExtras from "../components/dashboard/DashboardExtras";
 
 function formatDuration(seconds = 0) {
   const total = Math.max(0, Number(seconds) || 0);
@@ -850,6 +851,8 @@ export default function DashboardPage() {
             </div>
           </SectionCard>
         </div>
+
+        <DashboardExtras />
       </div>
     </div>
   );

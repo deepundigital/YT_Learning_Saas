@@ -14,13 +14,19 @@ async function startServer() {
     if (!process.env.MONGO_URI) {
       throw new Error("MONGO_URI is NOT defined");
     }
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET is NOT defined");
+    }
+    if (!process.env.PORT) {
+      throw new Error("PORT is NOT defined");
+    }
 
     await mongoose.connect(process.env.MONGO_URI);
     console.log("MongoDB connected");
 
- const PORT = process.env.PORT || 3000;
+    const PORT = process.env.PORT || 3000;
 
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on port ${PORT}`);
     });
 
