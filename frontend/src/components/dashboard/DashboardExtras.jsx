@@ -26,7 +26,7 @@ function SectionCard({ title, icon: Icon, children, className = "" }) {
   );
 }
 
-export default function DashboardExtras() {
+export default function DashboardExtras({ onUpdate }) {
   useEffect(() => {
     // Only load tasks or other relevant data if needed
   }, []);
@@ -36,7 +36,7 @@ export default function DashboardExtras() {
       {/* Task & Timetable Grid */}
       <div className="grid gap-6 md:grid-cols-2">
         <SectionCard title="Today's Tasks" icon={CheckSquare} className="h-[400px]">
-          <TaskSystem onTaskCompleted={loadStreak} />
+          <TaskSystem onTaskCompleted={onUpdate} />
         </SectionCard>
         
         <SectionCard title="Timetable" icon={CalendarDays} className="h-[400px]">

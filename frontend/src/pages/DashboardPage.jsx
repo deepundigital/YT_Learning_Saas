@@ -869,7 +869,7 @@ export default function DashboardPage() {
           </SectionCard>
         </div>
 
-        <DashboardExtras />
+        <DashboardExtras onUpdate={loadDashboard} />
       </div>
     </div>
   );
