@@ -11,12 +11,16 @@ async function connectDB() {
 
   try {
     console.log("Connecting to MongoDB...");
-    console.log("MONGO_URI:", env.MONGO_URI);
+
+    if (!env.MONGO_URI) {
+      throw new Error("MONGO_URI is not defined in environment variables");
+    }
 
     mongoose.set("strictQuery", true);
 
     await mongoose.connect(env.MONGO_URI, {
-      autoIndex: true
+      autoIndex: true,
+      serverSelectionTimeoutMS: 5000, // fail fast if DB not reachable
     });
 
     isConnected = true;
@@ -36,10 +40,11 @@ async function connectDB() {
     });
 
     return mongoose.connection;
+
   } catch (error) {
     console.error("Failed to connect to MongoDB");
     console.error(error.message);
-    throw error;
+    process.exit(1); // 🔥 important: crash cleanly in production
   }
 }
 
