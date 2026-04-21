@@ -5,54 +5,13 @@ const User = require("../models/User");
 const Connection = require("../models/Connection");
 const Message = require("../models/Message");
 
-// Access Control Middlewares
-const requireCommunityAccess = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.userId || req.user.id);
-    if (!user || user.level < 1) {
-      return res.status(403).json({ 
-        success: false, 
-        locked: true,
-        message: "Unlock Community after a 10-day streak! 🔥",
-        currentStreak: user?.stats?.streakDays || 0
-      });
-    }
-    next();
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-const requireDirectConnect = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.userId || req.user.id);
-    if (!user || user.level < 2) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Direct connections unlock at Level 2 (20-day streak)! 🔥" 
-      });
-    }
-    next();
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
 // [GET] /api/community/users
-// Fetch all users except logged-in user
-// Apply restriction: Level 1 only sees names and streaks.
-router.get("/users", auth, requireCommunityAccess, async (req, res) => {
+router.get("/users", auth, async (req, res) => {
   try {
     const currentUserId = req.user.userId || req.user.id;
-    const user = await User.findById(currentUserId);
-    const userLevel = user.level || 0;
+    const { search } = req.query;
 
     const query = { _id: { $ne: currentUserId } };
-
-    // Level 2 filtering: Only show same level
-    if (userLevel === 2) {
-      query.level = 2;
-    }
 
     if (search) {
       query.$or = [
@@ -61,14 +20,16 @@ router.get("/users", auth, requireCommunityAccess, async (req, res) => {
       ];
     }
 
-    // Select fields based on access
     let selectFields = "name username avatar bio stats level";
     
     const users = await User.find(query)
       .select(selectFields)
       .lean();
 
-    res.json(users);
+    res.json({
+      success: true,
+      users
+    });
   } catch (err) {
     console.error("Fetch users error:", err);
     res.status(500).json({ success: false, message: "Failed to fetch users" });
@@ -76,17 +37,11 @@ router.get("/users", auth, requireCommunityAccess, async (req, res) => {
 });
 
 // [POST] /send-request
-router.post("/send-request", auth, requireCommunityAccess, async (req, res) => {
+router.post("/send-request", auth, async (req, res) => {
   try {
     const senderId = req.user.userId || req.user.id;
-    const user = await User.findById(senderId);
-
-    if (user.level < 2) {
-      return res.status(403).json({ error: "Connect feature unlocks at Level 2! 🔥" });
-    }
-
     const { receiverId } = req.body;
-
+    
     if (!receiverId) return res.status(400).json({ error: "Receiver ID required" });
 
     // Check existing
@@ -106,6 +61,16 @@ router.post("/send-request", auth, requireCommunityAccess, async (req, res) => {
     });
 
     await connection.save();
+
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+    if (io && onlineUsers) {
+      const receiverSocketId = onlineUsers.get(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("new_request", { senderId, receiverId });
+      }
+    }
+
     res.json({ success: true, message: "Connection request sent" });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -122,7 +87,50 @@ router.post("/accept-request", auth, async (req, res) => {
 
     connection.status = "accepted";
     await connection.save();
+
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+    if (io && onlineUsers) {
+      const senderSocketId = onlineUsers.get(connection.sender.toString());
+      const receiverSocketId = onlineUsers.get(connection.receiver.toString());
+      
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("request_accepted", { senderId: connection.sender, receiverId: connection.receiver });
+      }
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("request_accepted", { senderId: connection.sender, receiverId: connection.receiver });
+      }
+    }
+
     res.json({ success: true, message: "Request accepted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// [POST] /remove-connection
+router.post("/remove-connection", auth, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const currentUserId = req.user.userId || req.user.id;
+
+    await Connection.findOneAndDelete({
+      $or: [
+        { sender: currentUserId, receiver: userId },
+        { sender: userId, receiver: currentUserId }
+      ]
+    });
+
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+    if (io && onlineUsers) {
+      const targetSocketId = onlineUsers.get(userId);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("connection_removed", { userId1: currentUserId, userId2: userId });
+      }
+    }
+
+    res.json({ success: true, message: "Connection removed" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -154,7 +162,6 @@ router.get("/connections", auth, async (req, res) => {
       ],
     }).populate("sender receiver", "name username avatar bio stats");
 
-    // Flatten for frontend
     const users = connections.map(c => {
       const other = c.sender._id.toString() === userId.toString() ? c.receiver : c.sender;
       return { ...other.toObject(), connectionId: c._id };
@@ -186,15 +193,9 @@ router.get("/messages/:userId", auth, async (req, res) => {
 });
 
 // [POST] Internal Message Saving
-router.post("/messages", auth, requireCommunityAccess, async (req, res) => {
+router.post("/messages", auth, async (req, res) => {
   try {
     const senderId = req.user.userId || req.user.id;
-    const user = await User.findById(senderId);
-
-    if (user.level < 2) {
-      return res.status(403).json({ error: "Messaging unlocks at Level 2! 🔥" });
-    }
-
     const { receiverId, message } = req.body;
 
     const newMessage = new Message({

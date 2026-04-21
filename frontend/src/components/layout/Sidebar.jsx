@@ -8,6 +8,7 @@ import {
   ListVideo,
   FileText,
   Users,
+  Flame,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -46,6 +47,11 @@ const navItems = [
     label: "Community",
     path: "/community",
     icon: Users,
+  },
+  {
+    label: "Streak",
+    path: "/dashboard/streak",
+    icon: Flame,
   },
 ];
 

@@ -64,6 +64,7 @@ io.on("connection", (socket) => {
 
 
 app.set("io", io);
+app.set("onlineUsers", onlineUsers);
 
 console.log("==== DEBUG START ====");
 console.log("MONGO_URI:", process.env.MONGO_URI ? "Defined" : "MISSING");

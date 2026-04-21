@@ -48,8 +48,26 @@ export default function CommunityPage() {
     });
 
     newSocket.on("receive_message", (data) => {
-      // Only add message if it's from the currently selected chat user
       setMessages((prev) => [...prev, data]);
+    });
+
+    newSocket.on("new_request", (data) => {
+      if (data.receiverId === id) {
+        fetchRequests();
+      }
+    });
+
+    newSocket.on("request_accepted", (data) => {
+      if (data.senderId === id || data.receiverId === id) {
+        fetchConnections();
+        fetchRequests();
+      }
+    });
+
+    newSocket.on("connection_removed", (data) => {
+      if (data.userId1 === id || data.userId2 === id) {
+        fetchConnections();
+      }
     });
 
     fetchInitialData();
@@ -67,20 +85,36 @@ export default function CommunityPage() {
         axios.get(`${API_BASE}/community/requests`, { headers })
       ]);
 
-      setStudents(studentsRes.data);
+      setStudents(studentsRes.data.users || []);
       setConnections(connectionsRes.data);
       setRequests(requestsRes.data);
+      console.log("Fetched users:", studentsRes.data);
     } catch (err) {
       console.error("Error fetching community data:", err);
-      if (err.response?.status === 403 && err.response?.data?.locked) {
-        // Handled by level check
-      }
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchRequests = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+      const res = await axios.get(`${API_BASE}/community/requests`, { headers });
+      setRequests(res.data);
+    } catch (err) {
+      console.error("Error fetching requests:", err);
+    }
+  };
 
+  const fetchConnections = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+      const res = await axios.get(`${API_BASE}/community/connections`, { headers });
+      setConnections(res.data);
+    } catch (err) {
+      console.error("Error fetching connections:", err);
+    }
+  };
 
   const fetchMessages = async (userId) => {
     try {
@@ -113,8 +147,6 @@ export default function CommunityPage() {
       const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
       if (status === "accepted") {
         await axios.post(`${API_BASE}/community/accept-request`, { connectionId }, { headers });
-      } else {
-        // Handle rejection if needed
       }
       fetchInitialData();
     } catch (err) {
@@ -131,14 +163,10 @@ export default function CommunityPage() {
         message: content 
       };
 
-      // 1. Send to API for storage
       const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
       const res = await axios.post(`${API_BASE}/community/messages`, messageData, { headers });
       
-      // 2. Add to local state
       setMessages((prev) => [...prev, res.data]);
-      
-      // 3. Emit via socket
       socket.emit("send_message", messageData);
     } catch (err) {
       console.error("Error sending message:", err);
@@ -149,63 +177,6 @@ export default function CommunityPage() {
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     s.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const isLocked = currentUser?.level === 0 || !currentUser?.unlockedFeatures?.communityAccess;
-
-  if (isLocked && !loading) {
-     const streak = currentUser?.streak || 0;
-     const progress = Math.min(100, (streak / 10) * 100);
-
-     return (
-       <div className="h-full flex items-center justify-center p-6">
-         <motion.div 
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           className="max-w-md w-full glass premium-border rounded-[2.5rem] p-8 text-center space-y-8 relative overflow-hidden"
-         >
-           <div className="absolute top-0 left-0 w-full h-1 bg-white/5">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                className="h-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]"
-              />
-           </div>
-
-           <div className="mx-auto w-24 h-24 rounded-3xl bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/20 shadow-[0_0_30px_rgba(249,115,22,0.1)]">
-             <Flame size={48} className="animate-pulse" />
-           </div>
-
-           <div className="space-y-3">
-             <h2 className="text-3xl font-black text-white tracking-tight uppercase">Community Locked</h2>
-             <p className="text-muted text-sm leading-relaxed">
-               Connect with peers and unlock real-time chat by hitting a <span className="text-orange-400 font-bold">10-day learning streak</span>.
-             </p>
-           </div>
-
-           <div className="space-y-4">
-              <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted px-1">
-                 <span>Progress</span>
-                 <span>{streak} / 10 Days</span>
-              </div>
-              <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
-                 <motion.div 
-                   initial={{ width: 0 }}
-                   animate={{ width: `${progress}%` }}
-                   className="h-full rounded-full bg-gradient-to-r from-orange-600 to-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
-                 />
-              </div>
-           </div>
-
-           <button 
-             onClick={() => window.location.href = "/dashboard"}
-             className="w-full py-4 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-[1.02] transition-all"
-           >
-             Continue Learning
-           </button>
-         </motion.div>
-       </div>
-     );
-  }
 
   return (
     <div className="h-[calc(100vh-120px)] flex gap-6">

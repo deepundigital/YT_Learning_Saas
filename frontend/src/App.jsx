@@ -12,6 +12,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AssignmentSolverPage from "./pages/AssignmentSolverPage";
 import CommunityPage from "./pages/CommunityPage";
+import StreakPage from "./pages/StreakPage";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/assignment-solver" element={<AssignmentSolverPage />} />
           <Route path="/community" element={<CommunityPage />} />
+          <Route path="/dashboard/streak" element={<StreakPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         </Route>

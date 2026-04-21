@@ -3,21 +3,18 @@ import { motion } from "framer-motion";
 import { UserPlus, Clock, Flame } from "lucide-react";
 
 export default function UserCard({ student, onConnect, isOnline, currentUserLevel }) {
-  const isLevel2 = student.level === 2;
-  const isSelfLevel1 = currentUserLevel === 1;
-
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       whileHover={{ y: -4 }}
-      className={`glass premium-border rounded-2xl p-5 group transition-all relative ${isSelfLevel1 && !isLevel2 ? "hover:shadow-none cursor-default" : ""}`}
+      className="glass premium-border rounded-2xl p-5 group transition-all relative"
     >
       <div className="flex items-center gap-4 mb-6">
         <div className="relative">
           <img
             src={student.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.username}`}
-            className={`w-14 h-14 rounded-2xl object-cover ring-2 ring-white/5 group-hover:ring-blue-500/30 transition-all shadow-xl ${isSelfLevel1 && !isLevel2 ? "" : ""}`}
+            className="w-14 h-14 rounded-2xl object-cover ring-2 ring-white/5 group-hover:ring-blue-500/30 transition-all shadow-xl"
             alt={student.name}
           />
           {isOnline && (
@@ -46,7 +43,7 @@ export default function UserCard({ student, onConnect, isOnline, currentUserLeve
         </div>
       </div>
 
-      <div className={`grid grid-cols-2 gap-3 mb-6 bg-white/5 rounded-xl p-3 border border-white/5 ${isSelfLevel1 ? "opacity-100" : ""}`}>
+      <div className="grid grid-cols-2 gap-3 mb-6 bg-white/5 rounded-xl p-3 border border-white/5">
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-1 text-orange-400">
             <Flame size={16} />
@@ -64,19 +61,13 @@ export default function UserCard({ student, onConnect, isOnline, currentUserLeve
         </div>
       </div>
 
-      {isSelfLevel1 ? (
-          <div className="w-full py-3 rounded-xl bg-white/5 text-muted/50 text-[10px] font-bold uppercase text-center border border-dashed border-white/10">
-             Unlock Connect at Level 2
-          </div>
-      ) : (
-          <button
-            onClick={() => onConnect(student._id)}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95"
-          >
-            <UserPlus size={18} />
-            <span>Connect</span>
-          </button>
-      )}
+      <button
+        onClick={() => onConnect(student._id)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+      >
+        <UserPlus size={18} />
+        <span>Connect</span>
+      </button>
     </motion.div>
   );
 }
