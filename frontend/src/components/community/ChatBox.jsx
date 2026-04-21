@@ -1,140 +1,103 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Smile, Paperclip, MoreVertical, Search, Phone, Video } from "lucide-react";
+import { Send, Image, MoreVertical, MessageCircle, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MessageBubble from "./MessageBubble";
 
 export default function ChatBox({ selectedUser, currentUser, socket, messages, onSendMessage }) {
-  const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const scrollRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
+  const [inputText, setInputText] = useState("");
+  const scrollRef = useRef();
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleInputChange = (e) => {
-    setInputValue(e.target.value);
-    
-    if (socket && selectedUser) {
-      socket.emit("typing", {
-        senderId: currentUser.id,
-        receiverId: selectedUser._id
-      });
-
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      
-      typingTimeoutRef.current = setTimeout(() => {
-        // Here you could emit a stop typing event if desired
-      }, 3000);
-    }
-  };
-
-  const handleSubmit = (e) => {
+  const handleSend = (e) => {
     e.preventDefault();
-    if (!inputValue.trim() || !selectedUser) return;
-    
-    onSendMessage(inputValue);
-    setInputValue("");
+    if (!inputText.trim()) return;
+    onSendMessage(inputText);
+    setInputText("");
   };
 
   if (!selectedUser) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-white/[0.02] rounded-3xl border-2 border-dashed border-white/5 mx-4 my-4">
-        <div className="p-6 rounded-full bg-blue-500/10 text-blue-400 mb-6 relative">
-          <Send size={48} className="translate-x-1 -translate-y-1" />
-          <div className="absolute inset-0 rounded-full border-2 border-blue-500/20 animate-ping"></div>
+      <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-white/[0.02] rounded-[2rem] border border-dashed border-white/10">
+        <div className="w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 mb-6 border border-blue-500/20">
+          <MessageCircle size={40} />
         </div>
-        <h3 className="text-2xl font-bold text-white mb-2">Student Community Chat</h3>
-        <p className="text-muted max-w-sm">Select a student from the sidebar to start a real-time conversation. Share doubts, learning resources and collaborate.</p>
+        <h3 className="text-xl font-bold text-white mb-2">Select a friend to chat</h3>
+        <p className="text-muted text-sm max-w-[280px]">
+          Pick someone from your connections to start a real-time conversation.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/40 rounded-3xl overflow-hidden glass border border-white/5">
+    <div className="h-full flex flex-col glass premium-border rounded-[2rem] overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
-        <div className="flex items-center gap-4">
+      <header className="p-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <div className="relative">
-            <img
-              src={selectedUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedUser.username}`}
-              alt={selectedUser.name}
-              className="w-12 h-12 rounded-xl object-cover"
+            <img 
+              src={selectedUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedUser.username}`} 
+              className="w-10 h-10 rounded-xl" 
+              alt="" 
             />
-            {selectedUser.online && (
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900"></div>
-            )}
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
           </div>
           <div>
-            <h3 className="font-bold text-white text-lg leading-tight">{selectedUser.name}</h3>
-            <p className="text-xs text-muted">
-              {selectedUser.online ? (
-                <span className="text-emerald-400 font-medium">Online</span>
-              ) : (
-                "Last seen recently"
-              )}
-            </p>
+            <h4 className="text-sm font-bold text-white">{selectedUser.name}</h4>
+            <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Active Now</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="p-2 rounded-lg text-muted hover:text-white hover:bg-white/5 transition"><Phone size={20} /></button>
-          <button className="p-2 rounded-lg text-muted hover:text-white hover:bg-white/5 transition"><Video size={20} /></button>
-          <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
-          <button className="p-2 rounded-lg text-muted hover:text-white hover:bg-white/5 transition"><MoreVertical size={20} /></button>
-        </div>
-      </div>
+        <button className="p-2 hover:bg-white/5 rounded-lg transition text-muted">
+          <MoreVertical size={20} />
+        </button>
+      </header>
 
       {/* Messages */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide"
-      >
-        <AnimatePresence initial={false}>
-          {messages.map((msg, index) => (
-            <MessageBubble
-              key={msg._id || index}
-              message={msg}
-              isMine={msg.sender === currentUser.id || msg.senderId === currentUser.id}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center opacity-30 gap-4">
+             <div className="p-4 rounded-full bg-white/5">
+                <MessageCircle size={32} />
+             </div>
+             <p className="text-sm italic">No messages yet. Start the conversation!</p>
+          </div>
+        ) : (
+          messages.map((msg, idx) => (
+            <MessageBubble 
+              key={msg._id || idx} 
+              message={msg} 
+              isMine={msg.sender === currentUser?.id || msg.senderId === currentUser?.id} 
             />
-          ))}
-        </AnimatePresence>
+          ))
+        )}
+        <div ref={scrollRef} />
       </div>
 
       {/* Input */}
-      <div className="p-6 pt-2">
-        <form 
-          onSubmit={handleSubmit}
-          className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-2 px-4 focus-within:border-blue-500/50 transition-all shadow-inner"
-        >
-          <button type="button" className="p-2 rounded-lg text-muted hover:text-blue-400 transition">
-            <Smile size={24} />
-          </button>
-          <button type="button" className="p-2 rounded-lg text-muted hover:text-blue-400 transition">
-            <Paperclip size={22} />
+      <form onSubmit={handleSend} className="p-4 border-t border-white/5 bg-white/[0.02]">
+        <div className="relative flex items-center gap-3">
+          <button type="button" className="p-2.5 text-muted hover:text-white transition hover:bg-white/5 rounded-xl">
+             <Image size={20} />
           </button>
           <input
             type="text"
-            value={inputValue}
-            onChange={handleInputChange}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
             placeholder={`Message ${selectedUser.name}...`}
-            className="flex-1 bg-transparent py-3 focus:outline-none text-white placeholder:text-muted/60"
+            className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-sm text-white placeholder:text-muted/50 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all font-medium"
           />
-          <button
+          <button 
             type="submit"
-            disabled={!inputValue.trim()}
-            className={`p-3 rounded-xl transition-all shadow-lg ${
-              inputValue.trim() 
-                ? "bg-blue-600 text-white shadow-blue-500/30 active:scale-95" 
-                : "bg-white/5 text-muted cursor-default"
-            }`}
+            disabled={!inputText.trim()}
+            className="p-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:bg-blue-600/50 text-white rounded-xl transition shadow-lg shadow-blue-600/20"
           >
-            <Send size={20} />
+            <Send size={18} />
           </button>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 }

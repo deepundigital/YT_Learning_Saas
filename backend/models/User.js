@@ -109,13 +109,38 @@ lastLoginAt: {
     isActive: {
       type: Boolean,
       default: true
+    },
+    level: {
+      type: Number,
+      default: 0
+    },
+    unlockedFeatures: {
+      communityAccess: { type: Boolean, default: false },
+      directConnect: { type: Boolean, default: false }
     }
   },
   {
     timestamps: true
   }
-  
 );
+
+userSchema.methods.updateLevel = function() {
+  const streak = this.stats?.streakDays || 0;
+  if (streak >= 20) {
+    this.level = 2;
+    this.unlockedFeatures.communityAccess = true;
+    this.unlockedFeatures.directConnect = true;
+  } else if (streak >= 10) {
+    this.level = 1;
+    this.unlockedFeatures.communityAccess = true;
+    this.unlockedFeatures.directConnect = false;
+  } else {
+    this.level = 0;
+    this.unlockedFeatures.communityAccess = false;
+    this.unlockedFeatures.directConnect = false;
+  }
+  return this.save();
+};
 
 
 

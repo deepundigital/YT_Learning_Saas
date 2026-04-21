@@ -13,24 +13,28 @@ const io = new Server(server, {
   },
 });
 
-// Store online users
+// Store online users: Map<userId, socketId>
 const onlineUsers = new Map();
 
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
+  const userId = socket.handshake.auth?.userId;
+  console.log("A user connected:", socket.id, "Auth UserID:", userId);
 
-  socket.on("join", (userId) => {
+  if (userId) {
     onlineUsers.set(userId, socket.id);
-    io.emit("userStatus", { userId, status: "online" });
-    console.log(`User ${userId} joined with socket ${socket.id}`);
-  });
+    io.emit("online-users", Array.from(onlineUsers.keys()));
+    console.log(`User ${userId} tracked. Total online:`, onlineUsers.size);
+  }
 
-  socket.on("sendMessage", async (data) => {
-    const { senderId, receiverId, content } = data;
+  socket.on("send_message", async (data) => {
+    const { senderId, receiverId, message } = data;
     const receiverSocketId = onlineUsers.get(receiverId);
 
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("receiveMessage", data);
+      io.to(receiverSocketId).emit("receive_message", {
+        ...data,
+        createdAt: new Date()
+      });
     }
   });
 
@@ -38,7 +42,7 @@ io.on("connection", (socket) => {
     const { senderId, receiverId } = data;
     const receiverSocketId = onlineUsers.get(receiverId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("userTyping", { userId: senderId });
+      io.to(receiverSocketId).emit("user-typing", { userId: senderId });
     }
   });
 
@@ -52,17 +56,17 @@ io.on("connection", (socket) => {
     }
     if (disconnectedUserId) {
       onlineUsers.delete(disconnectedUserId);
-      io.emit("userStatus", { userId: disconnectedUserId, status: "offline" });
+      io.emit("online-users", Array.from(onlineUsers.keys()));
     }
-    console.log("User disconnected:", socket.id);
+    console.log("User disconnected:", socket.id, "Remaining online:", onlineUsers.size);
   });
 });
 
-// Inject io into request for use in controllers if needed
+
 app.set("io", io);
 
 console.log("==== DEBUG START ====");
-console.log("MONGO_URI:", process.env.MONGO_URI);
+console.log("MONGO_URI:", process.env.MONGO_URI ? "Defined" : "MISSING");
 console.log("PORT:", process.env.PORT);
 console.log("==== DEBUG END ====");
 
@@ -77,7 +81,7 @@ async function startServer() {
 
     const PORT = process.env.PORT || 5000;
 
-    server.listen(PORT, () => {
+    server.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on port ${PORT}`);
     });
   } catch (error) {
@@ -86,4 +90,4 @@ async function startServer() {
   }
 }
 
-startServer();
+startServer();

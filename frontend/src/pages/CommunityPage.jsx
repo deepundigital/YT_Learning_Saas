@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { io } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, UserCheck, UserPlus, Search, MessageSquare, Loader2, Info } from "lucide-react";
+import { Users, UserCheck, UserPlus, Search, MessageSquare, Loader2, Info, Flame } from "lucide-react";
 import axios from "axios";
 import UserCard from "../components/community/UserCard";
 import ChatBox from "../components/community/ChatBox";
@@ -11,7 +11,7 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
 export default function CommunityPage() {
-  const [activeTab, setActiveTab] = useState("all"); // "all", "connections", "requests"
+  const [activeTab, setActiveTab] = useState("all"); 
   const [students, setStudents] = useState([]);
   const [connections, setConnections] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -21,29 +21,35 @@ export default function CommunityPage() {
   const [messages, setMessages] = useState([]);
   const [socket, setSocket] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]); // List of user IDs
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    // Ensure we have an ID
     const id = user._id || user.id;
-    setCurrentUser({ ...user, id });
+    setCurrentUser({ ...user, id, _id: id });
 
     // Initialize socket
-    const newSocket = io(SOCKET_URL);
-    setSocket(newSocket);
-
-    if (id) {
-      newSocket.emit("join", id);
-    }
-
-    newSocket.on("receiveMessage", (data) => {
-      setMessages((prev) => [...prev, data]);
+    const newSocket = io(SOCKET_URL, {
+      auth: {
+        userId: id
+      }
     });
 
-    newSocket.on("userStatus", ({ userId, status }) => {
-      setStudents((prev) => 
-        prev.map(s => s._id === userId ? { ...s, online: status === "online" } : s)
-      );
+    setSocket(newSocket);
+    console.log("Socket connecting with UserID:", id);
+
+    newSocket.on("connect", () => {
+      console.log("Socket connected, socket ID:", newSocket.id);
+    });
+
+    newSocket.on("online-users", (userIds) => {
+      console.log("Online users updated:", userIds);
+      setOnlineUsers(userIds);
+    });
+
+    newSocket.on("receive_message", (data) => {
+      // Only add message if it's from the currently selected chat user
+      setMessages((prev) => [...prev, data]);
     });
 
     fetchInitialData();
@@ -51,31 +57,30 @@ export default function CommunityPage() {
     return () => newSocket.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (selectedChatUser) {
-      fetchMessages(selectedChatUser._id);
-    }
-  }, [selectedChatUser]);
-
   const fetchInitialData = async () => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
       const [studentsRes, connectionsRes, requestsRes] = await Promise.all([
-        axios.get(`${API_BASE}/community/students`, { headers }),
+        axios.get(`${API_BASE}/community/users`, { headers }),
         axios.get(`${API_BASE}/community/connections`, { headers }),
         axios.get(`${API_BASE}/community/requests`, { headers })
       ]);
 
-      setStudents(studentsRes.data.students);
+      setStudents(studentsRes.data);
       setConnections(connectionsRes.data);
       setRequests(requestsRes.data);
     } catch (err) {
       console.error("Error fetching community data:", err);
+      if (err.response?.status === 403 && err.response?.data?.locked) {
+        // Handled by level check
+      }
     } finally {
       setLoading(false);
     }
   };
+
+
 
   const fetchMessages = async (userId) => {
     try {
@@ -87,11 +92,16 @@ export default function CommunityPage() {
     }
   };
 
+  useEffect(() => {
+    if (selectedChatUser) {
+      fetchMessages(selectedChatUser._id);
+    }
+  }, [selectedChatUser]);
+
   const handleConnect = async (receiverId) => {
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
-      await axios.post(`${API_BASE}/community/connect`, { receiverId }, { headers });
-      // Update local state or re-fetch
+      await axios.post(`${API_BASE}/community/send-request`, { receiverId }, { headers });
       fetchInitialData();
     } catch (err) {
       console.error("Error connecting:", err);
@@ -101,7 +111,11 @@ export default function CommunityPage() {
   const handleRespond = async (connectionId, status) => {
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
-      await axios.post(`${API_BASE}/community/connection-respond`, { connectionId, status }, { headers });
+      if (status === "accepted") {
+        await axios.post(`${API_BASE}/community/accept-request`, { connectionId }, { headers });
+      } else {
+        // Handle rejection if needed
+      }
       fetchInitialData();
     } catch (err) {
       console.error("Error responding to request:", err);
@@ -109,31 +123,26 @@ export default function CommunityPage() {
   };
 
   const handleSendMessage = async (content) => {
-    if (!selectedChatUser) return;
+    if (!selectedChatUser || !socket) return;
     try {
-      const body = { receiverId: selectedChatUser._id, content };
-      const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
-      const res = await axios.post(`${API_BASE}/community/messages`, body, { headers });
-      
-      const newMsg = res.data;
-      setMessages((prev) => [...prev, newMsg]);
-      
-      socket.emit("sendMessage", {
-        ...newMsg,
+      const messageData = { 
         senderId: currentUser.id,
-        receiverId: selectedChatUser._id
-      });
+        receiverId: selectedChatUser._id, 
+        message: content 
+      };
+
+      // 1. Send to API for storage
+      const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+      const res = await axios.post(`${API_BASE}/community/messages`, messageData, { headers });
+      
+      // 2. Add to local state
+      setMessages((prev) => [...prev, res.data]);
+      
+      // 3. Emit via socket
+      socket.emit("send_message", messageData);
     } catch (err) {
       console.error("Error sending message:", err);
     }
-  };
-
-  // Status mapping for connection logic
-  const getConnectionStatus = (studentId) => {
-    if (connections.some(c => c.sender?._id === studentId || c.receiver?._id === studentId)) return "accepted";
-    if (requests.some(r => r.sender?._id === studentId)) return "pending_incoming";
-    // Check if we sent a request (this would need another API or more logic)
-    return "none";
   };
 
   const filteredStudents = students.filter(s => 
@@ -141,12 +150,62 @@ export default function CommunityPage() {
     s.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const sidebarConnections = useMemo(() => {
-    return connections.map(c => {
-      const other = c.sender._id === currentUser?.id ? c.receiver : c.sender;
-      return { ...other, connectionId: c._id };
-    });
-  }, [connections, currentUser]);
+  const isLocked = currentUser?.level === 0 || !currentUser?.unlockedFeatures?.communityAccess;
+
+  if (isLocked && !loading) {
+     const streak = currentUser?.streak || 0;
+     const progress = Math.min(100, (streak / 10) * 100);
+
+     return (
+       <div className="h-full flex items-center justify-center p-6">
+         <motion.div 
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           className="max-w-md w-full glass premium-border rounded-[2.5rem] p-8 text-center space-y-8 relative overflow-hidden"
+         >
+           <div className="absolute top-0 left-0 w-full h-1 bg-white/5">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                className="h-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]"
+              />
+           </div>
+
+           <div className="mx-auto w-24 h-24 rounded-3xl bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/20 shadow-[0_0_30px_rgba(249,115,22,0.1)]">
+             <Flame size={48} className="animate-pulse" />
+           </div>
+
+           <div className="space-y-3">
+             <h2 className="text-3xl font-black text-white tracking-tight uppercase">Community Locked</h2>
+             <p className="text-muted text-sm leading-relaxed">
+               Connect with peers and unlock real-time chat by hitting a <span className="text-orange-400 font-bold">10-day learning streak</span>.
+             </p>
+           </div>
+
+           <div className="space-y-4">
+              <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted px-1">
+                 <span>Progress</span>
+                 <span>{streak} / 10 Days</span>
+              </div>
+              <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
+                 <motion.div 
+                   initial={{ width: 0 }}
+                   animate={{ width: `${progress}%` }}
+                   className="h-full rounded-full bg-gradient-to-r from-orange-600 to-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
+                 />
+              </div>
+           </div>
+
+           <button 
+             onClick={() => window.location.href = "/dashboard"}
+             className="w-full py-4 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-[1.02] transition-all"
+           >
+             Continue Learning
+           </button>
+         </motion.div>
+       </div>
+     );
+  }
 
   return (
     <div className="h-[calc(100vh-120px)] flex gap-6">
@@ -179,7 +238,7 @@ export default function CommunityPage() {
                 <tab.icon size={14} />
                 <span>{tab.label}</span>
                 {tab.id === "requests" && requests.length > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-red-500 text-[10px] flex items-center justify-center text-white">{requests.length}</span>
+                  <span className="w-4 h-4 rounded-full bg-red-500 text-[10px] flex items-center justify-center text-white font-bold">{requests.length}</span>
                 )}
               </button>
             ))}
@@ -206,7 +265,8 @@ export default function CommunityPage() {
                     <p className="text-muted text-sm">Finding awesome students...</p>
                   </div>
                 ) : filteredStudents.length === 0 ? (
-                  <div className="text-center py-20 opacity-40">
+                  <div className="flex flex-col items-center justify-center py-20 opacity-40">
+                    <Users size={48} className="mb-4" />
                     <p>No students found</p>
                   </div>
                 ) : (
@@ -216,7 +276,8 @@ export default function CommunityPage() {
                         key={student._id} 
                         student={student} 
                         onConnect={handleConnect}
-                        connectionStatus={getConnectionStatus(student._id)}
+                        isOnline={onlineUsers.includes(student._id)}
+                        currentUserLevel={currentUser?.level}
                       />
                     ))}
                   </div>
@@ -227,12 +288,12 @@ export default function CommunityPage() {
 
           {activeTab === "connections" && (
              <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-hide">
-                {sidebarConnections.length === 0 ? (
+                {connections.length === 0 ? (
                   <div className="text-center py-20 opacity-40">
                     <p>No connections yet</p>
                   </div>
                 ) : (
-                  sidebarConnections.map(user => (
+                  connections.map(user => (
                     <motion.button
                       key={user._id}
                       onClick={() => setSelectedChatUser(user)}
@@ -245,7 +306,9 @@ export default function CommunityPage() {
                     >
                       <div className="relative">
                         <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-12 h-12 rounded-xl" alt="" />
-                        {user.online && <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900"></div>}
+                        {onlineUsers.includes(user._id) && (
+                          <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                        )}
                       </div>
                       <div className="text-left flex-1 overflow-hidden">
                         <p className="font-bold text-white text-sm truncate">{user.name}</p>
@@ -253,7 +316,7 @@ export default function CommunityPage() {
                       </div>
                       <div className="flex flex-col items-end gap-1">
                          <div className="flex items-center gap-1 text-orange-400 text-xs">
-                           <span className="font-bold">{user.stats?.streakDays || 0}</span>
+                           <span className="font-bold">{user.stats?.streakDays || 0} 🔥</span>
                          </div>
                       </div>
                     </motion.button>

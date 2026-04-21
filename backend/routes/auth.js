@@ -32,6 +32,9 @@ function sanitizeUser(user) {
     authProvider: user.authProvider || "local",
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
+    level: user.level || 0,
+    unlockedFeatures: user.unlockedFeatures || { communityAccess: false, directConnect: false },
+    streak: user.stats?.streakDays || 0
   };
 }
 
@@ -118,6 +121,7 @@ router.post("/register", async (req, res) => {
       authProvider: "local",
     });
 
+    await user.updateLevel();
     const token = signToken(user);
 
     return res.status(201).json({
@@ -169,7 +173,7 @@ router.post("/login", async (req, res) => {
     }
 
     user.lastLoginAt = new Date();
-    await user.save();
+    await user.updateLevel();
 
     const token = signToken(user);
 
@@ -353,8 +357,7 @@ router.post("/google", async (req, res) => {
     } else {
       user.googleId = payload.sub;
       user.authProvider = "google";
-      user.lastLoginAt = new Date();
-      await user.save();
+      await user.updateLevel();
     }
 
     const token = signToken(user);
@@ -380,7 +383,7 @@ router.post("/google", async (req, res) => {
 router.get("/me", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select(
-      "_id name email createdAt updatedAt authProvider"
+      "_id name email createdAt updatedAt authProvider level unlockedFeatures stats"
     );
 
     if (!user) {
