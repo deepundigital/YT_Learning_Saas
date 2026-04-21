@@ -1,7 +1,6 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 const createApp = require("./app");
-const env = require("./config/env");
 
 const app = createApp();
 
@@ -12,20 +11,23 @@ console.log("==== DEBUG END ====");
 
 async function startServer() {
   try {
-    await mongoose.connect(env.MONGO_URI);
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is NOT defined");
+    }
+
+    await mongoose.connect(process.env.MONGO_URI);
     console.log("MongoDB connected");
 
-    app.listen(env.PORT, () => {
-      console.log(`Server running on http://localhost:${env.PORT}`);
+    const PORT = process.env.PORT;
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
     });
+
   } catch (error) {
     console.error("Server startup error:", error.message);
     process.exit(1);
   }
 }
-if (!env.MONGO_URI) {
-  throw new Error("MONGO_URI is NOT defined");
-}
-console.log("MONGO_URI CHECK:", process.env.MONGO_URI);
 
 startServer();
