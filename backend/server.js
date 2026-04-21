@@ -5,6 +5,11 @@ const env = require("./config/env");
 
 const app = createApp();
 
+console.log("==== DEBUG START ====");
+console.log("MONGO_URI:", process.env.MONGO_URI);
+console.log("PORT:", process.env.PORT);
+console.log("==== DEBUG END ====");
+
 async function startServer() {
   try {
     await mongoose.connect(env.MONGO_URI);
