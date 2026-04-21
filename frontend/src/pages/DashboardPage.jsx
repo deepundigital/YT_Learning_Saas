@@ -133,6 +133,10 @@ function describeAIInput(type, input, youtubeId) {
       return String(input.question);
     }
 
+    if (normalizedType.includes("assignment")) {
+      return `Solved assignment: ${input.instructions || "Standard solution"}`;
+    }
+
     if (
       (normalizedType.includes("ask") || normalizedType.includes("chat")) &&
       input.message
@@ -368,6 +372,12 @@ export default function DashboardPage() {
       title: "Ask AI",
       desc: "Open chat-based learning and doubt solving.",
       onClick: () => navigate("/workspace/jNQXAC9IVRw"),
+    },
+    {
+      icon: Bot,
+      title: "Assignment Solver",
+      desc: "Get step-by-step solutions for your homework.",
+      onClick: () => navigate("/assignment-solver"),
     },
   ];
 

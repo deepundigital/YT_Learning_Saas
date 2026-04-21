@@ -10,6 +10,7 @@ import SettingsPage from "./pages/SettingsPage";
 import AppLayout from "./layouts/AppLayout";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AssignmentSolverPage from "./pages/AssignmentSolverPage";
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/playlists" element={<PlaylistsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/assignment-solver" element={<AssignmentSolverPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         </Route>

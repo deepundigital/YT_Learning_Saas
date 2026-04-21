@@ -17,6 +17,7 @@ const {
   generateVideoQuiz,
   chatWithVideo,
   generateFlashcards,
+  solveAssignment
 } = require("../services/ai/aiProvider");
 
 const {
@@ -826,6 +827,42 @@ router.get("/quiz-attempts/:youtubeId", auth, async (req, res) => {
       ok: false,
       error: "Failed to fetch video quiz attempts",
       details: err.message,
+    });
+  }
+});
+router.post("/solve-assignment", auth, async (req, res) => {
+  try {
+    const { content, instructions } = req.body;
+
+    if (!content) {
+      return res.status(400).json({
+        ok: false,
+        error: "Assignment content is required",
+      });
+    }
+
+    const userId = getUserId(req);
+
+    const result = await solveAssignment({ content, instructions });
+
+    await AIInteraction.create({
+      user: userId,
+      type: "assignment",
+      input: { instructions },
+      output: { solution: result.raw },
+      source: "upload",
+    });
+
+    return res.json({
+      ok: true,
+      solution: result.raw,
+    });
+  } catch (err) {
+    console.error("AI assignment error:", err.response?.data || err.message);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to solve assignment",
+      details: err.response?.data || err.message,
     });
   }
 });

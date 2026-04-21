@@ -4,6 +4,7 @@ const { buildAskPrompt } = require("./prompts/askPrompt");
 const { buildQuizPrompt } = require("./prompts/quizPrompt");
 const { buildChatPrompt } = require("./prompts/chatPrompt");
 const { buildFlashcardPrompt } = require("./prompts/flashcardPrompt");
+const { buildAssignmentPrompt } = require("./prompts/assignmentPrompt");
 
 async function generateVideoSummary({ video, transcriptText }) {
   const messages = buildSummaryPrompt({ video, transcriptText });
@@ -40,10 +41,17 @@ async function generateFlashcards({ video, transcriptText, count = 8 }) {
   return { raw: text };
 }
 
+async function solveAssignment({ content, instructions }) {
+  const messages = buildAssignmentPrompt({ content, instructions });
+  const text = await chatCompletion(messages);
+  return { raw: text };
+}
+
 module.exports = {
   generateVideoSummary,
   askVideoQuestion,
   generateVideoQuiz,
   chatWithVideo,
-  generateFlashcards
+  generateFlashcards,
+  solveAssignment
 };

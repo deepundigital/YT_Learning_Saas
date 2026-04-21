@@ -6,6 +6,7 @@ import {
   Settings,
   Sparkles,
   ListVideo,
+  FileText,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -34,6 +35,11 @@ const navItems = [
     label: "Settings",
     path: "/settings",
     icon: Settings,
+  },
+  {
+    label: "Assignment",
+    path: "/assignment-solver",
+    icon: FileText,
   },
 ];
 
