@@ -36,6 +36,32 @@ router.get("/users", auth, async (req, res) => {
   }
 });
 
+// [GET] /api/community/leaderboard
+router.get("/leaderboard", auth, async (req, res) => {
+  try {
+    const { sortBy = "xp" } = req.query;
+    
+    let sortObj = {};
+    if (sortBy === "streak") sortObj = { "stats.streakDays": -1 };
+    else if (sortBy === "videos") sortObj = { "stats.completedVideos": -1 };
+    else sortObj = { "stats.xp": -1 };
+
+    const topUsers = await User.find({ isActive: true })
+      .select("name username avatar stats level bio")
+      .sort(sortObj)
+      .limit(20)
+      .lean();
+
+    res.json({
+      success: true,
+      leaderboard: topUsers
+    });
+  } catch (err) {
+    console.error("Leaderboard error:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch leaderboard" });
+  }
+});
+
 // [POST] /send-request
 router.post("/send-request", auth, async (req, res) => {
   try {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { io } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, UserCheck, UserPlus, Search, MessageSquare, Loader2, Info, Flame } from "lucide-react";
+import { Users, UserCheck, UserPlus, Search, MessageSquare, Loader2, Info, Flame, Trophy } from "lucide-react";
 import axios from "axios";
 import UserCard from "../components/community/UserCard";
 import ChatBox from "../components/community/ChatBox";
@@ -16,6 +16,7 @@ export default function CommunityPage() {
   const [students, setStudents] = useState([]);
   const [connections, setConnections] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedChatUser, setSelectedChatUser] = useState(null);
@@ -88,25 +89,29 @@ export default function CommunityPage() {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
-      const [studentsRes, connectionsRes, requestsRes] = await Promise.all([
+      const [studentsRes, connectionsRes, requestsRes, leaderboardRes] = await Promise.all([
         axios.get(`${API_BASE}/community/users`, { headers }),
         axios.get(`${API_BASE}/community/connections`, { headers }),
-        axios.get(`${API_BASE}/community/requests`, { headers })
+        axios.get(`${API_BASE}/community/requests`, { headers }),
+        axios.get(`${API_BASE}/community/leaderboard`, { headers })
       ]);
 
       console.log("[API] Fetched users response:", studentsRes.data);
       console.log("[API] Fetched connections response:", connectionsRes.data);
       console.log("[API] Fetched requests response:", requestsRes.data);
+      console.log("[API] Fetched leaderboard response:", leaderboardRes.data);
 
       setStudents(studentsRes.data.users || (Array.isArray(studentsRes.data) ? studentsRes.data : []));
       setConnections(Array.isArray(connectionsRes.data) ? connectionsRes.data : []);
       setRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
+      setLeaderboard(leaderboardRes.data.leaderboard || []);
     } catch (err) {
       console.error("Error fetching community data:", err);
     } finally {
       setLoading(false);
     }
   };
+
 
   const fetchRequests = async () => {
     try {
@@ -202,6 +207,7 @@ export default function CommunityPage() {
             {[
               { id: "all", label: "Discovery", icon: UserPlus },
               { id: "connections", label: "Friends", icon: UserCheck },
+              { id: "leaderboard", label: "Leaderboard", icon: Trophy },
               { id: "requests", label: "Requests", icon: Info }
             ].map((tab) => (
               <button
@@ -260,6 +266,57 @@ export default function CommunityPage() {
                 )}
               </div>
             </>
+          )}
+
+          {activeTab === "leaderboard" && (
+            <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+              <div className="glass premium-border rounded-2xl p-4 bg-blue-500/5 border-blue-500/10">
+                <div className="flex items-center gap-3">
+                  <Trophy className="text-yellow-500" size={20} />
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Global Leaderboard</h3>
+                    <p className="text-[10px] text-muted">Ranked by overall XP</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-hide">
+                {leaderboard.map((user, index) => (
+                  <div 
+                    key={user._id}
+                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+                      user._id === currentUser?._id 
+                      ? "bg-blue-600/10 border-blue-500/50" 
+                      : "bg-white/5 border-white/5 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className="w-8 flex justify-center font-black text-lg italic text-white/20">
+                      #{index + 1}
+                    </div>
+                    <div className="relative">
+                      <img 
+                        src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} 
+                        className="w-10 h-10 rounded-xl" 
+                        alt="" 
+                      />
+                      {onlineUsers.includes(user._id) && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-white text-sm truncate">{user.name}</p>
+                      <p className="text-[10px] text-muted truncate">@{user.username}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-blue-400">{user.stats?.xp || 0} XP</p>
+                      <div className="flex items-center justify-end gap-1">
+                        <Flame size={10} className="text-orange-400" />
+                        <span className="text-[10px] font-bold text-orange-400">{user.stats?.streakDays || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {activeTab === "connections" && (
