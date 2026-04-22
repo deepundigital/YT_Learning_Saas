@@ -8,6 +8,7 @@ import {
   Bot,
   BrainCircuit,
   Bookmark,
+  Calendar,
   Clock3,
   FileText,
   Flame,
@@ -229,11 +230,28 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [playlistsCount, setPlaylistsCount] = useState(0);
   const [quizAttempts, setQuizAttempts] = useState([]);
+  const [userData, setUserData] = useState(getStoredUser());
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  }, []);
+
+  const todayDate = useMemo(() => {
+    return new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }, []);
 
   useEffect(() => {
     loadDashboard();
@@ -400,32 +418,54 @@ export default function DashboardPage() {
     },
   ];
 
-  const weakTopics = useMemo(() => {
-    return deriveWeakTopics(quizAttempts);
-  }, [quizAttempts]);
+  const motivationalQuote = useMemo(() => {
+    const quotes = [
+      "The only way to learn a new programming language is by writing programs in it.",
+      "Code is like humor. When you have to explain it, it’s bad.",
+      "First, solve the problem. Then, write the code.",
+      "Experience is the name everyone gives to their mistakes.",
+      "Knowledge is power. Information is liberating.",
+      "The beautiful thing about learning is that nobody can take it away from you.",
+    ];
+    return quotes[Math.floor(Math.random() * quotes.length)];
+  }, []);
 
   return (
     <div className="min-h-screen text-[var(--text)]">
       <div className="section-container py-6 md:py-8">
+        {/* ... existing header ... */}
         <motion.div
           initial={{ opacity: 0, y: -18 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="glass rounded-2xl p-3">
-                <LayoutDashboard className="text-blue-300" size={20} />
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <img 
+                  src={userData?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData?.username || 'user'}`} 
+                  className="w-14 h-14 rounded-2xl border-2 border-blue-500/20 shadow-xl"
+                  alt="" 
+                />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0a0a]"></div>
               </div>
               <div>
-                <p className="text-sm text-muted">Premium Workspace</p>
-                <h1 className="text-xl font-bold md:text-2xl">Dashboard</h1>
+                <h1 className="text-2xl font-black md:text-3xl tracking-tight">
+                  {greeting}, <span className="gradient-text">{userData?.name?.split(' ')[0] || 'Learner'}</span>!
+                </h1>
+                <p className="text-sm text-muted font-medium flex items-center gap-2">
+                  <Calendar size={14} className="text-blue-400" /> {todayDate}
+                </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+                <Flame size={18} className="text-orange-400" />
+                <span className="text-sm font-bold">{stats?.streakDays || 0} Day Streak</span>
+              </div>
               <ThemeToggle />
-              <Button variant="secondary" onClick={loadDashboard}>
+              <Button variant="secondary" onClick={loadDashboard} className="rounded-xl">
                 Refresh
               </Button>
             </div>
@@ -523,7 +563,23 @@ export default function DashboardPage() {
             </div>
             <div className="mt-8 border-b border-white/10" />
           </motion.div>
-        ) : null}
+        ) : (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mb-8 p-6 rounded-3xl bg-blue-600/5 border border-blue-500/10 flex items-center gap-6"
+          >
+            <div className="hidden md:flex w-12 h-12 rounded-2xl bg-blue-500/10 items-center justify-center text-blue-400 shrink-0">
+              <Sparkles size={24} />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] font-black text-blue-500/50 mb-1">Daily Inspiration</p>
+              <p className="text-lg font-medium text-white/90 italic leading-relaxed">
+                "{motivationalQuote}"
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <motion.div
@@ -873,30 +929,27 @@ export default function DashboardPage() {
               title="Quick actions"
               subtitle="Move fast through your workflow"
             >
-              <div className="grid gap-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 {quickActions.map((item, index) => {
                   const Icon = item.icon;
 
                   return (
                     <motion.button
                       key={item.title}
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: index * 0.06 }}
-                      whileHover={{ y: -3 }}
+                      whileHover={{ y: -4, backgroundColor: "rgba(255,255,255,0.08)" }}
                       onClick={item.onClick}
-                      className="flex items-center justify-between rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-left transition hover:border-white/20"
+                      className="flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-5 text-left transition-all"
                     >
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-2xl bg-blue-500/10 p-3 text-blue-300">
-                          <Icon size={18} />
-                        </div>
-                        <div>
-                          <p className="font-medium">{item.title}</p>
-                          <p className="mt-1 text-sm text-muted">{item.desc}</p>
-                        </div>
+                      <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                        <Icon size={20} />
                       </div>
-                      <ArrowUpRight className="text-muted" size={18} />
+                      <div>
+                        <p className="font-bold text-sm">{item.title}</p>
+                        <p className="mt-1 text-xs text-muted leading-relaxed line-clamp-2">{item.desc}</p>
+                      </div>
                     </motion.button>
                   );
                 })}
