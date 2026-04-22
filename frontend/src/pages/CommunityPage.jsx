@@ -55,7 +55,19 @@ export default function CommunityPage() {
     });
 
     newSocket.on("newMessage", (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        // Only add if message belongs to the selected chat user
+        // (Either I sent it to them, or they sent it to me)
+        const isFromSelected = msg.sender === selectedChatUser?._id || msg.receiver === selectedChatUser?._id;
+        
+        // OR if it's my own message (though handleSendMessage might already add it)
+        // Actually, the server sends newMessage to BOTH sender and receiver.
+        
+        if (selectedChatUser && (msg.sender === selectedChatUser._id || msg.receiver === selectedChatUser._id)) {
+           return [...prev, msg];
+        }
+        return prev;
+      });
     });
 
     newSocket.on("new_request", (data) => {

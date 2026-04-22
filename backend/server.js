@@ -51,7 +51,8 @@ io.use((socket, next) => {
 
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
-    socket.userId = decoded.userId;
+    // Use the same ID extraction logic as the auth middleware
+    socket.userId = decoded.id || decoded._id || decoded.userId;
     next();
   } catch (err) {
     console.error("Socket authentication error:", err.message);
