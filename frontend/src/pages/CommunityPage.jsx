@@ -30,9 +30,9 @@ export default function CommunityPage() {
 
     // Initialize socket
     const newSocket = io(SOCKET_URL, {
-      auth: {
-        userId: id
-      }
+      withCredentials: true,
+      auth: { userId: id },
+      transports: ["websocket"],
     });
 
     setSocket(newSocket);
@@ -42,13 +42,13 @@ export default function CommunityPage() {
       console.log("Socket connected, socket ID:", newSocket.id);
     });
 
-    newSocket.on("online-users", (userIds) => {
+    newSocket.on("onlineUsers", (userIds) => {
       console.log("Online users updated:", userIds);
       setOnlineUsers(userIds);
     });
 
-    newSocket.on("receive_message", (data) => {
-      setMessages((prev) => [...prev, data]);
+    newSocket.on("newMessage", (msg) => {
+      setMessages((prev) => [...prev, msg]);
     });
 
     newSocket.on("new_request", (data) => {
@@ -72,7 +72,10 @@ export default function CommunityPage() {
 
     fetchInitialData();
 
-    return () => newSocket.disconnect();
+    return () => {
+      newSocket.off("newMessage");
+      newSocket.disconnect();
+    };
   }, []);
 
   const fetchInitialData = async () => {
@@ -157,17 +160,10 @@ export default function CommunityPage() {
   const handleSendMessage = async (content) => {
     if (!selectedChatUser || !socket) return;
     try {
-      const messageData = { 
-        senderId: currentUser.id,
-        receiverId: selectedChatUser._id, 
-        message: content 
-      };
-
-      const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
-      const res = await axios.post(`${API_BASE}/community/messages`, messageData, { headers });
-      
-      setMessages((prev) => [...prev, res.data]);
-      socket.emit("send_message", messageData);
+      socket.emit("sendMessage", {
+        receiverId: selectedChatUser._id,
+        message: content
+      });
     } catch (err) {
       console.error("Error sending message:", err);
     }
