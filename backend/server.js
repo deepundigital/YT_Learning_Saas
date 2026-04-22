@@ -13,7 +13,9 @@ const app = createApp();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : ["http://localhost:5173"],
+    origin: process.env.FRONTEND_URL 
+      ? ["http://localhost:5173", process.env.FRONTEND_URL] 
+      : ["http://localhost:5173"],
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -37,7 +39,10 @@ const onlineUsers = new Map();
 
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
-  if (!token) return next(new Error("Authentication error: Token missing"));
+  if (!token) {
+    console.error("[Socket Middleware] Connection rejected: Missing token");
+    return next(new Error("Authentication error: Token missing"));
+  }
 
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
@@ -64,14 +69,15 @@ io.on("connection", (socket) => {
         content: message,
       });
       
-      console.log("Message sent:", message);
+      console.log("Message sent by", socket.userId, "to", receiverId, ":", message);
 
       const receiverSocketId = onlineUsers.get(receiverId);
-      console.log("Receiver socket:", receiverSocketId);
+      console.log("Receiver socket found:", receiverSocketId ? "YES" : "NO", "(Socket ID:", receiverSocketId, ")");
 
       // SEND TO RECEIVER
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("newMessage", newMessage);
+        console.log("Emitted newMessage to receiver:", receiverId);
       }
 
       // SEND BACK TO SENDER (IMPORTANT)

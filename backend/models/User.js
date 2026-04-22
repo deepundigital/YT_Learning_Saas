@@ -98,6 +98,12 @@ const userSchema = new mongoose.Schema(
         default: 0
       }
     },
+    codingProfiles: {
+      leetcode: { type: String, default: "" },
+      codeforces: { type: String, default: "" },
+      codechef: { type: String, default: "" },
+      tuf: { type: String, default: "" }
+    },
     lastLoginAt: {
       type: Date,
       default: null
