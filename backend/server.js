@@ -81,16 +81,17 @@ io.on("connection", (socket) => {
       console.log(`[Message] ${socket.userId} -> ${receiverIdStr}: "${message}"`);
 
       const receiverSocketId = onlineUsers.get(receiverIdStr);
+      const messageData = newMessage.toObject();
       
       if (receiverSocketId) {
-        io.to(receiverSocketId).emit("newMessage", newMessage);
+        io.to(receiverSocketId).emit("newMessage", messageData);
         console.log(`[Socket] Delivered to socket: ${receiverSocketId}`);
       } else {
         console.log(`[Socket] Receiver ${receiverIdStr} is OFFLINE. Saved to DB only.`);
       }
 
       // SEND BACK TO SENDER
-      socket.emit("newMessage", newMessage);
+      socket.emit("newMessage", messageData);
     } catch (err) {
       console.error("[Socket] Message error:", err);
     }

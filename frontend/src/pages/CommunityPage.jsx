@@ -60,9 +60,18 @@ export default function CommunityPage() {
     });
 
     newSocket.on("newMessage", (msg) => {
+      console.log("[Socket] Received message:", msg);
       setMessages((prev) => {
         const currentChatUser = selectedChatUserRef.current;
-        if (currentChatUser && (msg.sender === currentChatUser._id || msg.receiver === currentChatUser._id)) {
+        if (!currentChatUser) return prev;
+
+        // Force string comparison for safety
+        const senderId = String(msg.sender?._id || msg.sender);
+        const receiverId = String(msg.receiver?._id || msg.receiver);
+        const chatWithId = String(currentChatUser._id || currentChatUser.id);
+
+        // If the message is part of our current open chat, add it
+        if (senderId === chatWithId || receiverId === chatWithId) {
            return [...prev, msg];
         }
         return prev;
