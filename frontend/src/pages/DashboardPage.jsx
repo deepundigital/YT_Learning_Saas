@@ -37,6 +37,7 @@ import Button from "../components/common/Button";
 import ThemeToggle from "../components/common/ThemeToggle";
 import { getDashboardAnalytics } from "../services/analyticsService";
 import { getPlaylists } from "../services/playlistService";
+import { getAllQuizAttempts } from "../services/aiService";
 import DashboardExtras from "../components/dashboard/DashboardExtras";
 
 function formatDuration(seconds = 0) {
@@ -62,31 +63,7 @@ function getStoredUser() {
   }
 }
 
-function getLocalQuizAttempts() {
-  try {
-    const user = getStoredUser();
-    const userId = user?._id || user?.id || user?.email || "guest";
-    const prefix = `quizAttempts:${userId}:`;
 
-    const attempts = [];
-
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith(prefix)) continue;
-
-      const raw = JSON.parse(localStorage.getItem(key) || "[]");
-      if (Array.isArray(raw)) {
-        attempts.push(...raw);
-      }
-    }
-
-    return attempts.sort(
-      (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
-    );
-  } catch {
-    return [];
-  }
-}
 
 function safeText(value, fallback = "No details") {
   if (value == null) return fallback;
@@ -258,19 +235,20 @@ export default function DashboardPage() {
     try {
       setLoading(true);
 
-      const [analyticsRes, playlistsRes] = await Promise.all([
+      const [analyticsRes, playlistsRes, quizAttemptsRes] = await Promise.all([
         getDashboardAnalytics(),
         getPlaylists(),
+        getAllQuizAttempts(),
       ]);
 
       setSummary(analyticsRes || null);
       setPlaylistsCount(playlistsRes?.playlists?.length || 0);
-      setQuizAttempts(getLocalQuizAttempts());
+      setQuizAttempts(quizAttemptsRes?.attempts || []);
     } catch (error) {
       console.error("Dashboard load error:", error);
       setSummary(null);
       setPlaylistsCount(0);
-      setQuizAttempts(getLocalQuizAttempts());
+      setQuizAttempts([]);
     } finally {
       setLoading(false);
     }
@@ -318,6 +296,9 @@ export default function DashboardPage() {
     return recent?.progress || [];
   }, [recent]);
 
+  const firstTrackedVideoId = recentStudyItems?.[0]?.videoId || "";
+  const workspaceRoute = firstTrackedVideoId ? `/workspace/${firstTrackedVideoId}` : "/workspace";
+
   const activityItems = useMemo(() => {
     const ai = (recent?.ai || []).map((item) => ({
       icon: Bot,
@@ -354,25 +335,25 @@ export default function DashboardPage() {
       icon: Sparkles,
       title: "Open Workspace",
       desc: "Continue learning on your current video session.",
-      onClick: () => navigate("/workspace/jNQXAC9IVRw"),
+      onClick: () => navigate(workspaceRoute),
     },
     {
       icon: ListVideo,
       title: "Manage Playlists",
       desc: "Import playlists and organize learning paths.",
-      onClick: () => navigate("/workspace/jNQXAC9IVRw"),
+      onClick: () => navigate(workspaceRoute),
     },
     {
       icon: BrainCircuit,
       title: "Start Quiz",
       desc: "Practice concepts using AI-generated quizzes.",
-      onClick: () => navigate("/workspace/jNQXAC9IVRw"),
+      onClick: () => navigate(workspaceRoute),
     },
     {
       icon: MessageSquare,
       title: "Ask AI",
       desc: "Open chat-based learning and doubt solving.",
-      onClick: () => navigate("/workspace/jNQXAC9IVRw"),
+      onClick: () => navigate(workspaceRoute),
     },
     {
       icon: Bot,
@@ -391,8 +372,6 @@ export default function DashboardPage() {
   const weakTopics = useMemo(() => {
     return deriveWeakTopics(quizAttempts);
   }, [quizAttempts]);
-
-  const firstTrackedVideoId = recentStudyItems?.[0]?.videoId || "jNQXAC9IVRw";
 
   return (
     <div className="min-h-screen text-[var(--text)]">

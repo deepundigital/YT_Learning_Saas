@@ -28,6 +28,7 @@ const {
 const {
   normalizeSummary,
   normalizeAsk,
+  safeJsonParse,
 } = require("../services/ai/formatters");
 
 const router = express.Router();
@@ -38,34 +39,6 @@ function sanitizeVideoId(raw) {
 
 function getUserId(req) {
   return req.user.userId || req.user.id;
-}
-
-function safeJsonParse(text) {
-  if (!text) return null;
-
-  const raw = String(text).trim();
-
-  try {
-    return JSON.parse(raw);
-  } catch {}
-
-  const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fencedMatch?.[1]) {
-    try {
-      return JSON.parse(fencedMatch[1].trim());
-    } catch {}
-  }
-
-  const firstBrace = raw.indexOf("{");
-  const lastBrace = raw.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    const candidate = raw.slice(firstBrace, lastBrace + 1).trim();
-    try {
-      return JSON.parse(candidate);
-    } catch {}
-  }
-
-  return null;
 }
 
 function addDays(date, days) {

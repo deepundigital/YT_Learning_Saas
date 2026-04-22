@@ -106,11 +106,32 @@ const login = async (req, res, next) => {
   }
 };
 
-const getMe = async (req, res) => {
-  return res.status(200).json({
-    ok: true,
-    user: req.user
-  });
+const getMe = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.userId).select("-passwordHash");
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        ok: false,
+        error: "User not found or deactivated"
+      });
+    }
+    return res.status(200).json({
+      ok: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        bio: user.bio,
+        preferences: user.preferences,
+        stats: user.stats,
+        lastLoginAt: user.lastLoginAt
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const updateMe = async (req, res, next) => {

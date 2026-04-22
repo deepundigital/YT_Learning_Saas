@@ -2,6 +2,8 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const http = require("http");
 const { Server } = require("socket.io");
+const jwt = require("jsonwebtoken");
+const env = require("./config/env");
 const { createAdapter } = require("@socket.io/redis-adapter");
 const { createClient } = require("redis");
 const createApp = require("./app");
@@ -36,16 +38,20 @@ if (process.env.REDIS_URL) {
 const onlineUsers = new Map();
 
 io.use((socket, next) => {
-  console.log("[Socket Middleware] Incoming connection auth:", socket.handshake.auth);
-  const userId = socket.handshake.auth?.userId;
-  
-  if (!userId) {
-    console.error("[Socket Middleware] Connection rejected: Missing userId");
-    return next(new Error("Invalid user: Missing userId"));
+  const token = socket.handshake.auth?.token;
+  if (!token) {
+    console.error("[Socket Middleware] Connection rejected: Missing token");
+    return next(new Error("Authentication error: Token missing"));
   }
-  
-  socket.userId = userId;
-  next();
+
+  try {
+    const decoded = jwt.verify(token, env.JWT_SECRET);
+    socket.userId = decoded.userId;
+    next();
+  } catch (err) {
+    console.error("Socket authentication error:", err.message);
+    return next(new Error("Authentication error: Invalid token"));
+  }
 });
 
 io.on("connection", (socket) => {
