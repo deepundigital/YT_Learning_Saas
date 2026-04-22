@@ -13,6 +13,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AssignmentSolverPage from "./pages/AssignmentSolverPage";
 import CommunityPage from "./pages/CommunityPage";
 import StreakPage from "./pages/StreakPage";
+import CodingDashboardPage from "./pages/CodingDashboardPage";
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
           <Route path="/assignment-solver" element={<AssignmentSolverPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/dashboard/streak" element={<StreakPage />} />
+          <Route path="/coding-dashboard" element={<CodingDashboardPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         </Route>

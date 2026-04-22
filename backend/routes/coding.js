@@ -5,10 +5,11 @@ const auth = require("../middleware/auth");
 
 router.use(auth);
 
-router.post("/profiles", codingController.updateProfiles);
-router.get("/stats", codingController.getDashboardStats);
-router.post("/solve", codingController.markProblemSolved);
-router.get("/social", codingController.getSocialLeaderboard);
+router.get("/tracker/:userId", codingController.getTrackerStats);
+router.post("/tracker/update", codingController.updateProfiles);
+router.get("/activity/today", codingController.getTodayActivity);
+router.get("/leaderboard", codingController.getLeaderboard);
+router.post("/solve", codingController.markProblemSolved); // Manual trigger
 router.get("/contests", codingController.getUpcomingContests);
 
 module.exports = router;

@@ -1,8 +1,9 @@
 const axios = require("axios");
 const NodeCache = require("node-cache");
+const cheerio = require("cheerio");
 
-// Cache for 15 minutes to avoid rate limiting
-const cache = new NodeCache({ stdTTL: 900 });
+// Cache for 1 hour to avoid rate limiting
+const cache = new NodeCache({ stdTTL: 3600 });
 
 async function fetchLeetCodeStats(username) {
   if (!username) return null;
@@ -10,20 +11,68 @@ async function fetchLeetCodeStats(username) {
   if (cache.has(cacheKey)) return cache.get(cacheKey);
 
   try {
-    const { data } = await axios.get(`https://alfa-leetcode-api.onrender.com/${username}`);
+    const query = `
+      query getUserProfile($username: String!) {
+        matchedUser(username: $username) {
+          submitStats {
+            acSubmissionNum {
+              difficulty
+              count
+            }
+          }
+        }
+        recentAcSubmissionList(username: $username, limit: 15) {
+          title
+          timestamp
+        }
+      }
+    `;
+
+    const { data } = await axios.post("https://leetcode.com/graphql", {
+      query,
+      variables: { username }
+    }, {
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    });
+
+    if (data.errors || !data.data.matchedUser) return null;
+
+    const stats = data.data.matchedUser.submitStats.acSubmissionNum;
+    const all = stats.find(s => s.difficulty === "All")?.count || 0;
+    const easy = stats.find(s => s.difficulty === "Easy")?.count || 0;
+    const medium = stats.find(s => s.difficulty === "Medium")?.count || 0;
+    const hard = stats.find(s => s.difficulty === "Hard")?.count || 0;
+
+    const recentSubmissions = data.data.recentAcSubmissionList || [];
+    
+    // Check if solved today
+    let solvedToday = false;
+    const todayStr = new Date().toISOString().split("T")[0];
+    for (const sub of recentSubmissions) {
+      const subDateStr = new Date(sub.timestamp * 1000).toISOString().split("T")[0];
+      if (subDateStr === todayStr) {
+        solvedToday = true;
+        break;
+      }
+    }
+
     const result = {
       platform: "leetcode",
       username,
-      totalSolved: data.totalSolved || 0,
-      easySolved: data.easySolved || 0,
-      mediumSolved: data.mediumSolved || 0,
-      hardSolved: data.hardSolved || 0,
-      ranking: data.ranking || "N/A"
+      totalSolved: all,
+      easySolved: easy,
+      mediumSolved: medium,
+      hardSolved: hard,
+      solvedToday
     };
+
     cache.set(cacheKey, result);
     return result;
   } catch (error) {
-    console.error("LeetCode fetch error:", error.message);
+    console.error("LeetCode GraphQL fetch error:", error.message);
     return null;
   }
 }
@@ -34,17 +83,34 @@ async function fetchCodeforcesStats(username) {
   if (cache.has(cacheKey)) return cache.get(cacheKey);
 
   try {
-    const { data } = await axios.get(`https://codeforces.com/api/user.info?handles=${username}`);
-    if (data.status === "OK" && data.result.length > 0) {
-      const info = data.result[0];
+    const [userInfoRes, userStatusRes] = await Promise.all([
+      axios.get(`https://codeforces.com/api/user.info?handles=${username}`),
+      axios.get(`https://codeforces.com/api/user.status?handle=${username}&from=1&count=20`)
+    ]);
+
+    let solvedToday = false;
+    const todayStr = new Date().toISOString().split("T")[0];
+    
+    if (userStatusRes.data.status === "OK") {
+      const recentAc = userStatusRes.data.result.filter(s => s.verdict === "OK");
+      for (const sub of recentAc) {
+        const subDateStr = new Date(sub.creationTimeSeconds * 1000).toISOString().split("T")[0];
+        if (subDateStr === todayStr) {
+          solvedToday = true;
+          break;
+        }
+      }
+    }
+
+    if (userInfoRes.data.status === "OK" && userInfoRes.data.result.length > 0) {
+      const info = userInfoRes.data.result[0];
       const result = {
         platform: "codeforces",
         username,
         rating: info.rating || 0,
         maxRating: info.maxRating || 0,
         rank: info.rank || "unrated",
-        // We can't trivially get "total solved" without fetching user.status, 
-        // so we'll just track rating and contests.
+        solvedToday
       };
       cache.set(cacheKey, result);
       return result;
@@ -62,22 +128,41 @@ async function fetchCodeChefStats(username) {
   if (cache.has(cacheKey)) return cache.get(cacheKey);
 
   try {
-    const { data } = await axios.get(`https://codechef-api.vercel.app/${username}`);
-    if (data.success) {
-      const result = {
-        platform: "codechef",
-        username,
-        rating: data.currentRating || 0,
-        highestRating: data.highestRating || 0,
-        stars: data.stars || "",
-        globalRank: data.globalRank || "N/A"
-      };
-      cache.set(cacheKey, result);
-      return result;
-    }
-    return null;
+    const { data } = await axios.get(`https://www.codechef.com/users/${username}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    });
+
+    const $ = cheerio.load(data);
+    
+    const ratingStr = $(".rating-number").text().trim();
+    const currentRating = parseInt(ratingStr, 10) || 0;
+    
+    const highestRatingStr = $(".rating-header .rating-star").parent().text();
+    const maxMatch = highestRatingStr.match(/Highest Rating\s*(\d+)/);
+    const highestRating = maxMatch ? parseInt(maxMatch[1], 10) : 0;
+    
+    const stars = $(".rating-star").first().text().trim() || "1★";
+
+    // Try to get total solved
+    const solvedStr = $("h3:contains('Fully Solved')").text();
+    const solvedMatch = solvedStr.match(/Fully Solved\s*\((\d+)\)/);
+    const totalSolved = solvedMatch ? parseInt(solvedMatch[1], 10) : 0;
+
+    const result = {
+      platform: "codechef",
+      username,
+      rating: currentRating,
+      highestRating,
+      stars,
+      totalSolved
+    };
+
+    cache.set(cacheKey, result);
+    return result;
   } catch (error) {
-    console.error("CodeChef fetch error:", error.message);
+    console.error("CodeChef cheerio fetch error:", error.message);
     return null;
   }
 }
@@ -87,7 +172,6 @@ async function fetchContests() {
   if (cache.has(cacheKey)) return cache.get(cacheKey);
 
   try {
-    // Codeforces contests
     const { data } = await axios.get("https://codeforces.com/api/contest.list");
     let contests = [];
     if (data.status === "OK") {
@@ -103,7 +187,6 @@ async function fetchContests() {
         }));
     }
     
-    // Attempt to fetch other contests via Kontests if available
     try {
       const lcRes = await axios.get("https://kontests.net/api/v1/leet_code");
       if (Array.isArray(lcRes.data)) {
@@ -116,15 +199,12 @@ async function fetchContests() {
           link: c.url
         })));
       }
-    } catch (e) {
-      console.error("LeetCode contests fetch error:", e.message);
-    }
+    } catch (e) {}
     
-    // Sort all contests by start time
     contests.sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
-    const result = contests.slice(0, 15); // limit to upcoming 15
+    const result = contests.slice(0, 15);
 
-    cache.set(cacheKey, result, 3600); // Cache contests for 1 hour
+    cache.set(cacheKey, result, 3600);
     return result;
   } catch (error) {
     console.error("Contests fetch error:", error.message);

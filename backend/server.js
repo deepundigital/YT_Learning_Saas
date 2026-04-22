@@ -8,6 +8,7 @@ const { createAdapter } = require("@socket.io/redis-adapter");
 const { createClient } = require("redis");
 const createApp = require("./app");
 const Message = require("./models/Message");
+const { initCron } = require("./cron/syncActivity");
 
 const app = createApp();
 const server = http.createServer(app);
@@ -105,6 +106,9 @@ io.on("connection", (socket) => {
 
 app.set("io", io);
 app.set("onlineUsers", onlineUsers);
+
+// Initialize Cron Jobs
+initCron(io);
 
 console.log("==== DEBUG START ====");
 console.log("MONGO_URI:", process.env.MONGO_URI ? "Defined" : "MISSING");
