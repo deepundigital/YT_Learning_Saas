@@ -15,11 +15,13 @@ import {
   ListVideo,
   MessageSquare,
   PlayCircle,
+  Search,
   Sparkles,
   Target,
   TrendingUp,
   Trophy,
   Users,
+  X,
   Zap,
 } from "lucide-react";
 import {
@@ -38,6 +40,7 @@ import ThemeToggle from "../components/common/ThemeToggle";
 import { getDashboardAnalytics } from "../services/analyticsService";
 import { getPlaylists } from "../services/playlistService";
 import { getAllQuizAttempts } from "../services/aiService";
+import { searchVideos } from "../services/videoService";
 import DashboardExtras from "../components/dashboard/DashboardExtras";
 
 function formatDuration(seconds = 0) {
@@ -227,6 +230,11 @@ export default function DashboardPage() {
   const [playlistsCount, setPlaylistsCount] = useState(0);
   const [quizAttempts, setQuizAttempts] = useState([]);
 
+  // Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+
   useEffect(() => {
     loadDashboard();
   }, []);
@@ -251,6 +259,29 @@ export default function DashboardPage() {
       setQuizAttempts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearch = async (e) => {
+    e?.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    try {
+      setIsSearching(true);
+      const res = await searchVideos(searchQuery, "playlist");
+      setSearchResults(res?.results || []);
+    } catch (err) {
+      console.error("Search error:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const startLearning = (id, type) => {
+    if (type === "playlist") {
+      navigate(`/workspace?playlistId=${id}`);
+    } else {
+      navigate(`/workspace/${id}`);
     }
   };
 
@@ -379,28 +410,120 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: -18 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 flex items-center justify-between gap-4"
+          className="mb-8"
         >
-          <div className="flex items-center gap-3">
-            <div className="glass rounded-2xl p-3">
-              <LayoutDashboard className="text-blue-300" size={20} />
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="glass rounded-2xl p-3">
+                <LayoutDashboard className="text-blue-300" size={20} />
+              </div>
+              <div>
+                <p className="text-sm text-muted">Premium Workspace</p>
+                <h1 className="text-xl font-bold md:text-2xl">Dashboard</h1>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted">Premium Workspace</p>
-              <h1 className="text-xl font-bold md:text-2xl">Dashboard</h1>
+
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              <Button variant="secondary" onClick={loadDashboard}>
+                Refresh
+              </Button>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Button variant="secondary" onClick={loadDashboard}>
-              Refresh
+          <form
+            onSubmit={handleSearch}
+            className="glass premium-border flex items-center gap-3 rounded-[1.5rem] p-2 pl-5 transition-all focus-within:ring-2 focus-within:ring-blue-500/40"
+          >
+            <Search className="text-muted" size={20} />
+            <input
+              type="text"
+              placeholder="Search topics to automate your learning (e.g. React, Python, Data Science)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 bg-transparent py-3 text-sm outline-none placeholder:text-muted"
+            />
+            <Button
+              type="submit"
+              disabled={isSearching}
+              className="rounded-xl px-6 py-2"
+            >
+              {isSearching ? "Searching..." : "Discover"}
             </Button>
-            <Button onClick={() => navigate(`/workspace/${firstTrackedVideoId}`)}>
-              New Session
-            </Button>
-          </div>
+            {searchResults.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchResults([]);
+                  setSearchQuery("");
+                }}
+                className="mr-2 rounded-lg p-2 text-muted hover:bg-white/5"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </form>
         </motion.div>
+
+        {searchResults.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-10"
+          >
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">
+                Found Tutorials for <span className="gradient-text">"{searchQuery}"</span>
+              </h2>
+              <button
+                onClick={() => setSearchResults([])}
+                className="text-sm text-blue-300 hover:underline"
+              >
+                Clear results
+              </button>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {searchResults.map((result, idx) => (
+                <motion.div
+                  key={result.id || idx}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="glass premium-border group overflow-hidden rounded-[1.75rem] transition-all hover:-translate-y-2"
+                >
+                  <div className="relative aspect-video overflow-hidden">
+                    <img
+                      src={result.thumbnail}
+                      alt={result.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 flex items-center justify-center">
+                      <PlayCircle className="text-white" size={48} />
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <p className="text-xs font-medium text-blue-300 uppercase tracking-wider mb-2">
+                      {result.channelTitle}
+                    </p>
+                    <h4 className="font-bold text-lg mb-4 line-clamp-2 min-h-[3.5rem]">
+                      {result.title}
+                    </h4>
+                    <Button
+                      fullWidth
+                      className="gap-2"
+                      onClick={() => startLearning(result.id, result.type)}
+                    >
+                      Initialize Workspace
+                      <Zap size={16} />
+                    </Button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+            <div className="mt-8 border-b border-white/10" />
+          </motion.div>
+        ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <motion.div
@@ -563,7 +686,7 @@ export default function DashboardPage() {
             right={<div className="text-sm text-muted">Real activity</div>}
           >
             <div className="h-[300px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={progressChartData}>
                   <defs>
                     <linearGradient id="minutesFill" x1="0" y1="0" x2="0" y2="1">
@@ -606,7 +729,7 @@ export default function DashboardPage() {
             subtitle="How your backend-tracked activity is distributed"
           >
             <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <BarChart data={distributionData}>
                   <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
                   <XAxis dataKey="name" stroke="#64748b" tickLine={false} axisLine={false} />

@@ -3,7 +3,8 @@ const auth = require("../middleware/auth");
 const Video = require("../models/Video");
 const {
   getVideoMetadata,
-  getPlaylistVideos
+  getPlaylistVideos,
+  searchYouTube
 } = require("../services/youtubeService");
 
 const router = express.Router();
@@ -15,6 +16,39 @@ function sanitizeVideoId(raw) {
 function sanitizePlaylistId(raw) {
   return String(raw || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
 }
+
+// Search YouTube educational content
+router.get("/search", auth, async (req, res) => {
+  try {
+    const { q, type, maxResults } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        ok: false,
+        error: "Search query 'q' is required"
+      });
+    }
+
+    const results = await searchYouTube(
+      q,
+      type || "playlist",
+      parseInt(maxResults) || 10
+    );
+
+    return res.json({
+      ok: true,
+      results
+    });
+  } catch (err) {
+    console.error("YouTube search error:", err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to search YouTube",
+      details: err.message
+    });
+  }
+});
 
 // Import/save a video in DB
 router.post("/import", auth, async (req, res) => {

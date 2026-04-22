@@ -113,8 +113,43 @@ async function getPlaylistVideos(playlistId, pageToken = "") {
   };
 }
 
+async function searchYouTube(query, type = "playlist", maxResults = 10) {
+  if (!query) throw new Error("Search query required");
+
+  if (!env.YOUTUBE_API_KEY) {
+    throw new Error("YOUTUBE_API_KEY missing in .env");
+  }
+
+  const response = await axios.get("https://www.googleapis.com/youtube/v3/search", {
+    params: {
+      part: "snippet",
+      q: `${query} tutorial course`, // Adding 'tutorial course' to narrow down results to educational content
+      type: type, // 'playlist' or 'video'
+      maxResults,
+      key: env.YOUTUBE_API_KEY,
+      ...(type === "video" ? { videoEmbeddable: "true" } : {})
+    },
+    timeout: 15000
+  });
+
+  return (response.data?.items || []).map((item) => ({
+    id: type === "playlist" ? item.id.playlistId : item.id.videoId,
+    type,
+    title: item.snippet?.title || "",
+    description: item.snippet?.description || "",
+    channelTitle: item.snippet?.channelTitle || "",
+    publishedAt: item.snippet?.publishedAt || null,
+    thumbnail:
+      item.snippet?.thumbnails?.high?.url ||
+      item.snippet?.thumbnails?.medium?.url ||
+      item.snippet?.thumbnails?.default?.url ||
+      ""
+  }));
+}
+
 module.exports = {
   getVideoMetadata,
   getPlaylistVideos,
+  searchYouTube,
   parseISODurationToSeconds
 };

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   CheckCircle2,
   ChevronDown,
@@ -192,6 +192,7 @@ function SectionToggle({ title, icon: Icon, open, onClick, subtitle }) {
 export default function WorkspacePage() {
   const { videoId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
@@ -303,9 +304,10 @@ export default function WorkspacePage() {
       if (containingPlaylist) {
         setSelectedPlaylistId(containingPlaylist._id);
       } else if (items.length > 0) {
-        setSelectedPlaylistId((prev) =>
-          items.some((p) => p._id === prev) ? prev : items[0]._id
-        );
+        setSelectedPlaylistId((prev) => {
+          if (items.some((p) => p._id === prev)) return prev;
+          return items[0]._id;
+        });
       } else {
         setSelectedPlaylistId("");
       }
@@ -314,6 +316,51 @@ export default function WorkspacePage() {
       setPlaylists([]);
       setSelectedPlaylistId("");
       showNotice("error", "Playlists load nahi hui.");
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const urlPlaylistId = params.get("playlistId");
+
+    if (urlPlaylistId) {
+      handleAutoImportPlaylist(urlPlaylistId);
+    }
+  }, [location.search]);
+
+  const handleAutoImportPlaylist = async (id) => {
+    try {
+      setPlaylistLoading(true);
+      const res = await getPlaylists();
+      const items = res?.playlists || [];
+      setPlaylists(items);
+
+      const existing = items.find((p) => p.youtubeId === id);
+
+      if (existing) {
+        setSelectedPlaylistId(existing._id);
+        if (!videoId && existing.videos?.length > 0) {
+          navigate(`/workspace/${existing.videos[0].videoId}`, { replace: true });
+        }
+        return;
+      }
+
+      const importRes = await importYouTubePlaylist(id, "Imported Playlist");
+      const newPlaylist = importRes?.playlist;
+
+      if (newPlaylist) {
+        setPlaylists((prev) => [newPlaylist, ...prev]);
+        setSelectedPlaylistId(newPlaylist._id);
+        showNotice("success", "Playlist automatically imported.");
+
+        if (!videoId && newPlaylist.videos?.length > 0) {
+          navigate(`/workspace/${newPlaylist.videos[0].videoId}`, { replace: true });
+        }
+      }
+    } catch (error) {
+      console.error("Auto import error:", error);
     } finally {
       setPlaylistLoading(false);
     }
