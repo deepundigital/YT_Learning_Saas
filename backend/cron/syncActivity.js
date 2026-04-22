@@ -34,7 +34,7 @@ const syncActivity = async (io) => {
         const activity = await CodingActivity.findOneAndUpdate(
           { user: user._id, date: today, platform },
           { $set: { solved: true } },
-          { new: true, upsert: true }
+          { returnDocument: "after", upsert: true }
         );
 
         if (io) {

@@ -12,7 +12,7 @@ exports.completeTask = async (req, res, next) => {
     const activity = await UserActivity.findOneAndUpdate(
       { userId, date },
       { $inc: { tasksCompleted: 1 } },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
 
     res.status(200).json({ ok: true, activity });

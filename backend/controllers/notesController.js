@@ -72,7 +72,7 @@ async function updateNote(req, res, next) {
     const note = await Note.findOneAndUpdate(
       { _id: req.params.noteId, user: req.user._id },
       req.body,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!note) {

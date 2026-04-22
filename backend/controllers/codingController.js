@@ -143,7 +143,7 @@ exports.markProblemSolved = async (req, res, next) => {
     const activity = await CodingActivity.findOneAndUpdate(
       { user: req.user._id, date: today, platform },
       { $set: { solved: true }, $inc: { problemsCount: 1 } },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
 
     const io = req.app.get("io");

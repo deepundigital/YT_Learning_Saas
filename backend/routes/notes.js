@@ -114,7 +114,7 @@ router.put("/:id", auth, validateObjectId("id"), async (req, res) => {
     const note = await Note.findOneAndUpdate(
       { _id: req.params.id, user: getUserId(req) },
       updates,
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!note) {

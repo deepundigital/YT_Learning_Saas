@@ -97,7 +97,7 @@ router.put("/:id", auth, async (req, res) => {
     const playlist = await Playlist.findOneAndUpdate(
       { _id: playlistId, user: userId },
       { name },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!playlist) {
