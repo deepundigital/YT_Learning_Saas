@@ -51,8 +51,9 @@ io.use((socket, next) => {
 
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
-    // Use the same ID extraction logic as the auth middleware
-    socket.userId = decoded.id || decoded._id || decoded.userId;
+    // Force ID to string to avoid Map mismatch (Object vs String)
+    const rawId = decoded.id || decoded._id || decoded.userId;
+    socket.userId = String(rawId);
     next();
   } catch (err) {
     console.error("Socket authentication error:", err.message);
@@ -61,35 +62,37 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.userId);
+  console.log(`[Socket] User joined: ${socket.userId} (Socket: ${socket.id})`);
   onlineUsers.set(socket.userId, socket.id);
   
-  io.emit("onlineUsers", Array.from(onlineUsers.keys()));
-  console.log("Online users:", Array.from(onlineUsers.keys()));
+  const onlineIds = Array.from(onlineUsers.keys());
+  io.emit("onlineUsers", onlineIds);
+  console.log("[Socket] Current online count:", onlineIds.length);
 
   socket.on("sendMessage", async ({ receiverId, message }) => {
     try {
+      const receiverIdStr = String(receiverId);
       const newMessage = await Message.create({
         sender: socket.userId,
-        receiver: receiverId,
+        receiver: receiverIdStr,
         content: message,
       });
       
-      console.log("Message sent by", socket.userId, "to", receiverId, ":", message);
+      console.log(`[Message] ${socket.userId} -> ${receiverIdStr}: "${message}"`);
 
-      const receiverSocketId = onlineUsers.get(receiverId);
-      console.log("Receiver socket found:", receiverSocketId ? "YES" : "NO", "(Socket ID:", receiverSocketId, ")");
-
-      // SEND TO RECEIVER
+      const receiverSocketId = onlineUsers.get(receiverIdStr);
+      
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("newMessage", newMessage);
-        console.log("Emitted newMessage to receiver:", receiverId);
+        console.log(`[Socket] Delivered to socket: ${receiverSocketId}`);
+      } else {
+        console.log(`[Socket] Receiver ${receiverIdStr} is OFFLINE. Saved to DB only.`);
       }
 
-      // SEND BACK TO SENDER (IMPORTANT)
+      // SEND BACK TO SENDER
       socket.emit("newMessage", newMessage);
     } catch (err) {
-      console.error("Message save error:", err);
+      console.error("[Socket] Message error:", err);
     }
   });
 
