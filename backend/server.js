@@ -2,39 +2,82 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const http = require("http");
 const { Server } = require("socket.io");
+const { createAdapter } = require("@socket.io/redis-adapter");
+const { createClient } = require("redis");
 const createApp = require("./app");
+const Message = require("./models/Message");
 
 const app = createApp();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: process.env.FRONTEND_URL 
+      ? ["http://localhost:5173", process.env.FRONTEND_URL] 
+      : ["http://localhost:5173"],
     methods: ["GET", "POST"],
+    credentials: true
   },
+  transports: ["websocket"],
 });
+
+if (process.env.REDIS_URL) {
+  const pubClient = createClient({ url: process.env.REDIS_URL });
+  const subClient = pubClient.duplicate();
+
+  Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log("Redis adapter connected");
+  }).catch((err) => {
+    console.error("Redis adapter connection error:", err);
+  });
+}
 
 // Store online users: Map<userId, socketId>
 const onlineUsers = new Map();
 
-io.on("connection", (socket) => {
+io.use((socket, next) => {
+  console.log("[Socket Middleware] Incoming connection auth:", socket.handshake.auth);
   const userId = socket.handshake.auth?.userId;
-  console.log("A user connected:", socket.id, "Auth UserID:", userId);
-
-  if (userId) {
-    onlineUsers.set(userId, socket.id);
-    io.emit("online-users", Array.from(onlineUsers.keys()));
-    console.log(`User ${userId} tracked. Total online:`, onlineUsers.size);
+  
+  if (!userId) {
+    console.error("[Socket Middleware] Connection rejected: Missing userId");
+    return next(new Error("Invalid user: Missing userId"));
   }
+  
+  socket.userId = userId;
+  next();
+});
 
-  socket.on("send_message", async (data) => {
-    const { senderId, receiverId, message } = data;
-    const receiverSocketId = onlineUsers.get(receiverId);
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.userId);
+  onlineUsers.set(socket.userId, socket.id);
+  
+  io.emit("onlineUsers", Array.from(onlineUsers.keys()));
+  console.log("Online users:", Array.from(onlineUsers.keys()));
 
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("receive_message", {
-        ...data,
-        createdAt: new Date()
+  socket.on("sendMessage", async ({ receiverId, message }) => {
+    try {
+      const newMessage = await Message.create({
+        sender: socket.userId,
+        receiver: receiverId,
+        content: message,
       });
+      
+      console.log("Message sent by", socket.userId, "to", receiverId, ":", message);
+
+      const receiverSocketId = onlineUsers.get(receiverId);
+      console.log("Receiver socket found:", receiverSocketId ? "YES" : "NO", "(Socket ID:", receiverSocketId, ")");
+
+      // SEND TO RECEIVER
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", newMessage);
+        console.log("Emitted newMessage to receiver:", receiverId);
+      }
+
+      // SEND BACK TO SENDER (IMPORTANT)
+      socket.emit("newMessage", newMessage);
+    } catch (err) {
+      console.error("Message save error:", err);
     }
   });
 
@@ -47,18 +90,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    let disconnectedUserId = null;
-    for (const [userId, socketId] of onlineUsers.entries()) {
-      if (socketId === socket.id) {
-        disconnectedUserId = userId;
-        break;
-      }
-    }
-    if (disconnectedUserId) {
-      onlineUsers.delete(disconnectedUserId);
-      io.emit("online-users", Array.from(onlineUsers.keys()));
-    }
-    console.log("User disconnected:", socket.id, "Remaining online:", onlineUsers.size);
+    onlineUsers.delete(socket.userId);
+    io.emit("onlineUsers", Array.from(onlineUsers.keys()));
+    console.log("User disconnected:", socket.userId, "Remaining online:", onlineUsers.size);
   });
 });
 
