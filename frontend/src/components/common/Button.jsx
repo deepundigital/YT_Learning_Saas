@@ -8,17 +8,19 @@ export default function Button({
 }) {
   const styles = {
     primary:
-      "bg-[linear-gradient(135deg,#4f8cff,#8b5cf6)] text-white shadow-[0_0_30px_rgba(79,140,255,0.3)]",
+      "bg-[linear-gradient(110deg,var(--brand),var(--brand-2))] text-white shadow-[0_4px_14px_rgba(59,130,246,0.2)] border border-white/10 hover:shadow-[0_6px_20px_rgba(59,130,246,0.3)]",
     secondary:
-      "glass border border-white/10 text-[var(--text)]",
+      "bg-transparent border border-white/10 text-[var(--text)] hover:bg-white/5",
+    danger:
+      "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20",
   };
 
   return (
     <motion.button
-      whileHover={{ y: -3, scale: 1.03 }}
-      whileTap={{ scale: 0.97 }}
-      transition={{ type: "spring", stiffness: 260, damping: 18 }}
-      className={`inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition ${styles[variant]} ${className}`}
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.15, ease: "easeInOut" }}
+      className={`inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${styles[variant]} ${className}`}
       {...props}
     >
       {children}

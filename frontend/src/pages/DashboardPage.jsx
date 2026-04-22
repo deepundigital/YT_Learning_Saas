@@ -176,29 +176,28 @@ function deriveWeakTopics(attempts = []) {
 
 function StatCard({ icon: Icon, title, value, note, tone = "blue", loading }) {
   const toneMap = {
-    blue: "bg-blue-500/10 text-blue-300",
-    violet: "bg-violet-500/10 text-violet-300",
-    cyan: "bg-cyan-500/10 text-cyan-300",
-    emerald: "bg-emerald-500/10 text-emerald-300",
+    blue: "text-blue-500",
+    violet: "text-violet-500",
+    cyan: "text-cyan-500",
+    emerald: "text-emerald-500",
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 22 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55 }}
-      whileHover={{ y: -6, scale: 1.01 }}
-      className="glass premium-border rounded-[1.75rem] p-5"
+      transition={{ duration: 0.4 }}
+      whileHover={{ y: -2 }}
+      className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 transition-colors hover:bg-white/[0.04]"
     >
-      <div className={`mb-4 inline-flex rounded-2xl p-3 ${toneMap[tone]}`}>
-        <Icon size={20} />
+      <div className="flex items-center gap-3 mb-3">
+        <Icon size={18} className={toneMap[tone]} />
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted">{title}</p>
       </div>
-
-      <p className="text-sm text-muted">{title}</p>
-      <p className="mt-2 text-3xl font-black tracking-tight">
+      <p className="text-3xl font-bold tracking-tight">
         {loading ? "--" : value}
       </p>
-      <p className="mt-2 text-sm text-muted">{note}</p>
+      <p className="mt-1 text-xs text-muted-2">{note}</p>
     </motion.div>
   );
 }
@@ -206,15 +205,15 @@ function StatCard({ icon: Icon, title, value, note, tone = "blue", loading }) {
 function SectionCard({ title, subtitle, right, children, className = "" }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 26 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className={`glass premium-border rounded-[2rem] p-6 ${className}`}
+      transition={{ duration: 0.5 }}
+      className={`rounded-[1.5rem] border border-white/5 bg-white/[0.015] p-6 shadow-sm ${className}`}
     >
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold">{title}</h3>
-          {subtitle ? <p className="mt-2 text-sm text-muted">{subtitle}</p> : null}
+          <h3 className="text-lg font-bold tracking-tight">{title}</h3>
+          {subtitle ? <p className="mt-1 text-xs text-muted">{subtitle}</p> : null}
         </div>
         {right}
       </div>
