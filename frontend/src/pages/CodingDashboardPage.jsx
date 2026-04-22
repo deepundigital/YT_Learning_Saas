@@ -51,8 +51,9 @@ export default function CodingDashboardPage() {
   }, []);
 
   const setupSocket = () => {
+    const token = localStorage.getItem("token");
     const socket = io(BACKEND_URL, {
-      auth: { userId: currentUser._id },
+      auth: { userId: currentUser._id, token },
       transports: ["websocket"],
       withCredentials: true
     });
@@ -127,7 +128,15 @@ export default function CodingDashboardPage() {
     try {
       await updateCodingProfiles(profiles);
       await fetchStats(); // Refresh stats with new usernames
+      alert("Profiles saved successfully!");
     } catch (err) {
+      if (err.response?.status === 401) {
+        window.location.href = "/login";
+      } else if (err.response?.status === 404) {
+        alert("User not found. Please log in again.");
+      } else {
+        alert("Failed to save profiles.");
+      }
       console.error("Failed to save profiles", err);
     }
   };

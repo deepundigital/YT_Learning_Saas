@@ -1,7 +1,19 @@
+import axios from "axios";
 import api from "./api";
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+
 export async function updateCodingProfiles(profiles) {
-  const { data } = await api.post("/coding/tracker/update", profiles);
+  console.log("Sending token:", localStorage.getItem("token"));
+  const { data } = await axios.post(
+    `${BACKEND_URL}/api/coding/tracker/update`,
+    profiles,
+    {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      }
+    }
+  );
   return data;
 }
 
