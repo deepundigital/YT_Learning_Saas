@@ -39,11 +39,7 @@ const navItems = [
     path: "/settings",
     icon: Settings,
   },
-  {
-    label: "Assignment",
-    path: "/assignment-solver",
-    icon: FileText,
-  },
+
   {
     label: "Community",
     path: "/community",

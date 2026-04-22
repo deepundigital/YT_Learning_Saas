@@ -10,7 +10,6 @@ import SettingsPage from "./pages/SettingsPage";
 import AppLayout from "./layouts/AppLayout";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import AssignmentSolverPage from "./pages/AssignmentSolverPage";
 import CommunityPage from "./pages/CommunityPage";
 import StreakPage from "./pages/StreakPage";
 import CodingDashboardPage from "./pages/CodingDashboardPage";
@@ -30,7 +29,6 @@ function App() {
           <Route path="/playlists" element={<PlaylistsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/assignment-solver" element={<AssignmentSolverPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/dashboard/streak" element={<StreakPage />} />
           <Route path="/coding-dashboard" element={<CodingDashboardPage />} />
