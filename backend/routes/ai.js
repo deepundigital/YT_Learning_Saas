@@ -138,7 +138,7 @@ async function upsertRevisionItemsFromFlashcards({
         },
       },
       {
-        new: true,
+        returnDocument: "after",
         upsert: true,
       }
     );
@@ -192,7 +192,7 @@ router.post(
           source: transcriptData.source,
           payload: normalized,
         },
-        { new: true, upsert: true }
+        { returnDocument: "after", upsert: true }
       );
 
       await AIInteraction.create({
@@ -535,7 +535,7 @@ router.post(
           source: transcriptData.source,
           cards: Array.isArray(output.cards) ? output.cards : [],
         },
-        { new: true, upsert: true }
+        { returnDocument: "after", upsert: true }
       );
 
       await AICache.findOneAndUpdate(
@@ -544,7 +544,7 @@ router.post(
           source: transcriptData.source,
           payload: output,
         },
-        { new: true, upsert: true }
+        { returnDocument: "after", upsert: true }
       );
 
       let revisionItemsCreated = 0;

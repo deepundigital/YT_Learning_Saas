@@ -134,7 +134,7 @@ router.put("/:id", auth, validateObjectId("id"), async (req, res) => {
     const goal = await StudyGoal.findOneAndUpdate(
       { _id: req.params.id, user: getUserId(req) },
       updates,
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!goal) {

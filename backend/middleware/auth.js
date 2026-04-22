@@ -13,8 +13,6 @@ module.exports = function (req, res, next) {
 
     const decoded = jwt.verify(token, env.JWT_SECRET);
 
-    console.log("Decoded token:", decoded);
-
     // IMPORTANT: match key correctly
     req.user = {
       id: decoded.id || decoded._id || decoded.userId

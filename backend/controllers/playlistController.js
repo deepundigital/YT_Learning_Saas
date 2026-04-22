@@ -218,7 +218,7 @@ async function updatePlaylist(req, res, next) {
     const playlist = await Playlist.findOneAndUpdate(
       { _id: req.params.playlistId, user: req.user._id },
       updates,
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     ).populate("videos.video");
 
     if (!playlist) {

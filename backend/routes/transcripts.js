@@ -64,7 +64,7 @@ async function saveTranscriptToDb(videoId, normalized) {
       source: normalized.source || "manual",
     },
     {
-      new: true,
+      returnDocument: "after",
       upsert: true,
       setDefaultsOnInsert: true,
     }
