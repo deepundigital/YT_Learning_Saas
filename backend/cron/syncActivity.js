@@ -8,18 +8,17 @@ const getTodayDateString = () => new Date().toISOString().split("T")[0];
 const syncActivity = async (io) => {
   console.log("[Cron] Starting hourly coding activity sync...");
   try {
-    const users = await User.find({ "codingProfiles": { $exists: true } });
+    const users = await User.find({ $or: [{ leetcode: { $ne: "" } }, { codeforces: { $ne: "" } }, { codechef: { $ne: "" } }] });
     const today = getTodayDateString();
 
     let updatedCount = 0;
 
     for (const user of users) {
-      const profiles = user.codingProfiles || {};
       const promises = [];
 
-      if (profiles.leetcode) promises.push(fetchLeetCodeStats(profiles.leetcode));
-      if (profiles.codeforces) promises.push(fetchCodeforcesStats(profiles.codeforces));
-      if (profiles.codechef) promises.push(fetchCodeChefStats(profiles.codechef));
+      if (user.leetcode) promises.push(fetchLeetCodeStats(user.leetcode));
+      if (user.codeforces) promises.push(fetchCodeforcesStats(user.codeforces));
+      if (user.codechef) promises.push(fetchCodeChefStats(user.codechef));
 
       const [lc, cf, cc] = await Promise.allSettled(promises);
 

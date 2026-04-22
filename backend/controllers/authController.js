@@ -7,7 +7,7 @@ const env = require("../config/env");
 function signToken(user) {
   return jwt.sign(
     {
-      userId: user._id.toString(),
+      id: user._id,
       email: user.email,
       role: user.role
     },
@@ -108,7 +108,7 @@ const login = async (req, res, next) => {
 
 const getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.userId).select("-passwordHash");
+    const user = await User.findById(req.user.id || req.user._id).select("-passwordHash");
     if (!user || !user.isActive) {
       return res.status(401).json({
         ok: false,

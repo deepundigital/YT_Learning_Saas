@@ -11,20 +11,21 @@ const getTodayDateString = () => new Date().toISOString().split("T")[0];
 
 exports.updateProfiles = async (req, res, next) => {
   try {
-    const { leetcode, codeforces, codechef, tuf } = req.body;
-    const user = await User.findById(req.user._id);
+    console.log("req.user:", req.user);
+    console.log("Finding user with ID:", req.user.id);
+    const userId = req.user.id;
 
-    if (!user) return res.status(404).json({ ok: false, error: "User not found" });
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    user.codingProfiles = {
-      leetcode: leetcode !== undefined ? leetcode : user.codingProfiles?.leetcode,
-      codeforces: codeforces !== undefined ? codeforces : user.codingProfiles?.codeforces,
-      codechef: codechef !== undefined ? codechef : user.codingProfiles?.codechef,
-      tuf: tuf !== undefined ? tuf : user.codingProfiles?.tuf
-    };
+    user.leetcode = req.body.leetcode;
+    user.codeforces = req.body.codeforces;
+    user.codechef = req.body.codechef;
+    if (req.body.tuf !== undefined) user.tuf = req.body.tuf;
 
     await user.save();
-    res.status(200).json({ ok: true, codingProfiles: user.codingProfiles });
+
+    res.json({ success: true, user });
   } catch (error) {
     next(error);
   }
@@ -32,16 +33,26 @@ exports.updateProfiles = async (req, res, next) => {
 
 exports.getTrackerStats = async (req, res, next) => {
   try {
-    const userId = req.params.userId === "me" ? req.user._id : req.params.userId;
+    console.log("req.user:", req.user);
+    console.log("Finding user with ID:", req.user.id);
+    
+    // Always use req.user.id to fetch the logged-in user's info for "me"
+    let userId = req.params.userId === "me" ? req.user.id : req.params.userId;
+    
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ ok: false, error: "User not found" });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const profiles = user.codingProfiles || {};
+    const profiles = {
+      leetcode: user.leetcode || "",
+      codeforces: user.codeforces || "",
+      codechef: user.codechef || "",
+      tuf: user.tuf || ""
+    };
     
     const [leetcodeStats, codeforcesStats, codechefStats] = await Promise.all([
-      profiles.leetcode ? fetchLeetCodeStats(profiles.leetcode) : null,
-      profiles.codeforces ? fetchCodeforcesStats(profiles.codeforces) : null,
-      profiles.codechef ? fetchCodeChefStats(profiles.codechef) : null
+      user.leetcode ? fetchLeetCodeStats(user.leetcode) : null,
+      user.codeforces ? fetchCodeforcesStats(user.codeforces) : null,
+      user.codechef ? fetchCodeChefStats(user.codechef) : null
     ]);
 
     // Compute streak
