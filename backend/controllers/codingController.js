@@ -6,6 +6,7 @@ const {
   fetchCodeChefStats,
   fetchContests
 } = require("../services/codingService");
+const { analyzeCodingStats } = require("../services/ai/aiProvider");
 
 const getTodayDateString = () => new Date().toISOString().split("T")[0];
 
@@ -98,6 +99,23 @@ exports.getTrackerStats = async (req, res, next) => {
       if (tempStreak > longestStreak) longestStreak = tempStreak;
     }
 
+    // Generate AI Feedback for the primary platform (priority: LeetCode > Codeforces > CodeChef)
+    let aiFeedback = null;
+    try {
+      if (leetcodeStats) {
+        const feedback = await analyzeCodingStats({ platform: "LeetCode", stats: leetcodeStats });
+        aiFeedback = feedback.raw;
+      } else if (codeforcesStats) {
+        const feedback = await analyzeCodingStats({ platform: "Codeforces", stats: codeforcesStats });
+        aiFeedback = feedback.raw;
+      } else if (codechefStats) {
+        const feedback = await analyzeCodingStats({ platform: "CodeChef", stats: codechefStats });
+        aiFeedback = feedback.raw;
+      }
+    } catch (aiErr) {
+      console.error("AI Feedback generation failed:", aiErr.message);
+    }
+
     res.status(200).json({
       ok: true,
       profiles,
@@ -108,7 +126,8 @@ exports.getTrackerStats = async (req, res, next) => {
         tuf: profiles.tuf ? { platform: "tuf", link: profiles.tuf } : null
       },
       currentStreak,
-      longestStreak
+      longestStreak,
+      aiFeedback
     });
   } catch (error) {
     next(error);

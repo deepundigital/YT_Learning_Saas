@@ -35,6 +35,7 @@ export default function CodingDashboardPage() {
   // Stats State
   const [profiles, setProfiles] = useState({ leetcode: "", codeforces: "", codechef: "", tuf: "" });
   const [stats, setStats] = useState({ leetcode: null, codeforces: null, codechef: null, tuf: null });
+  const [aiFeedback, setAiFeedback] = useState(null);
   const [activityToday, setActivityToday] = useState({});
   const [currentStreak, setCurrentStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
@@ -94,6 +95,7 @@ export default function CodingDashboardPage() {
       if (res.ok) {
         setProfiles(res.profiles || { leetcode: "", codeforces: "", codechef: "", tuf: "" });
         setStats(res.stats || {});
+        setAiFeedback(res.aiFeedback || null);
         setCurrentStreak(res.currentStreak || 0);
         setLongestStreak(res.longestStreak || 0);
       }
@@ -153,7 +155,30 @@ export default function CodingDashboardPage() {
   };
 
   const renderStats = () => (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="space-y-6">
+      {aiFeedback && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass premium-border rounded-[2rem] p-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20"
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-2xl bg-blue-500/20 text-blue-400">
+              <Code2 size={24} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                AI Coding Mentor <span className="text-[10px] uppercase tracking-widest bg-blue-500 text-white px-2 py-0.5 rounded-full">Pro Advice</span>
+              </h3>
+              <p className="text-sm text-blue-100/80 leading-relaxed italic">
+                "{aiFeedback}"
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-2">
       {/* Profile Settings */}
       <div className="glass premium-border rounded-[2rem] p-6">
         <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -271,7 +296,8 @@ export default function CodingDashboardPage() {
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 
   const renderSocial = () => (
     <div className="glass premium-border rounded-[2rem] p-6 lg:p-10">

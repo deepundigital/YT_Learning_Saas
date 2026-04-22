@@ -5,6 +5,7 @@ const { buildQuizPrompt } = require("./prompts/quizPrompt");
 const { buildChatPrompt } = require("./prompts/chatPrompt");
 const { buildFlashcardPrompt } = require("./prompts/flashcardPrompt");
 const { buildAssignmentPrompt } = require("./prompts/assignmentPrompt");
+const { buildCodingPrompt } = require("./prompts/codingPrompt");
 
 const MAX_TRANSCRIPT_LENGTH = 35000;
 
@@ -55,11 +56,18 @@ async function solveAssignment({ content, instructions }) {
   return { raw: text };
 }
 
+async function analyzeCodingStats({ platform, stats }) {
+  const messages = buildCodingPrompt({ platform, stats });
+  const text = await chatCompletion(messages);
+  return { raw: text };
+}
+
 module.exports = {
   generateVideoSummary,
   askVideoQuestion,
   generateVideoQuiz,
   chatWithVideo,
   generateFlashcards,
-  solveAssignment
+  solveAssignment,
+  analyzeCodingStats
 };
