@@ -7,8 +7,9 @@ import UserCard from "../components/community/UserCard";
 import ChatBox from "../components/community/ChatBox";
 import RequestPanel from "../components/community/RequestPanel";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_URL || `${BACKEND_URL}/api`;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || BACKEND_URL;
 
 export default function CommunityPage() {
   const [activeTab, setActiveTab] = useState("all"); 
@@ -30,16 +31,20 @@ export default function CommunityPage() {
 
     // Initialize socket
     const newSocket = io(SOCKET_URL, {
-      withCredentials: true,
       auth: { userId: id },
       transports: ["websocket"],
+      withCredentials: true
     });
 
     setSocket(newSocket);
-    console.log("Socket connecting with UserID:", id);
+    console.log("[Socket Init] Connecting to:", SOCKET_URL, "with UserID:", id);
 
     newSocket.on("connect", () => {
-      console.log("Socket connected, socket ID:", newSocket.id);
+      console.log("[Socket Success] Connected with socket ID:", newSocket.id);
+    });
+
+    newSocket.on("connect_error", (err) => {
+      console.error("[Socket Error] Connection failed:", err.message);
     });
 
     newSocket.on("onlineUsers", (userIds) => {
@@ -88,10 +93,13 @@ export default function CommunityPage() {
         axios.get(`${API_BASE}/community/requests`, { headers })
       ]);
 
-      setStudents(studentsRes.data.users || []);
-      setConnections(connectionsRes.data);
-      setRequests(requestsRes.data);
-      console.log("Fetched users:", studentsRes.data);
+      console.log("[API] Fetched users response:", studentsRes.data);
+      console.log("[API] Fetched connections response:", connectionsRes.data);
+      console.log("[API] Fetched requests response:", requestsRes.data);
+
+      setStudents(studentsRes.data.users || (Array.isArray(studentsRes.data) ? studentsRes.data : []));
+      setConnections(Array.isArray(connectionsRes.data) ? connectionsRes.data : []);
+      setRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
     } catch (err) {
       console.error("Error fetching community data:", err);
     } finally {
@@ -103,7 +111,7 @@ export default function CommunityPage() {
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
       const res = await axios.get(`${API_BASE}/community/requests`, { headers });
-      setRequests(res.data);
+      setRequests(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Error fetching requests:", err);
     }
@@ -113,7 +121,7 @@ export default function CommunityPage() {
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
       const res = await axios.get(`${API_BASE}/community/connections`, { headers });
-      setConnections(res.data);
+      setConnections(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Error fetching connections:", err);
     }

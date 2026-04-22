@@ -9,6 +9,7 @@ import {
   FileText,
   Users,
   Flame,
+  Code2,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -52,6 +53,11 @@ const navItems = [
     label: "Streak",
     path: "/dashboard/streak",
     icon: Flame,
+  },
+  {
+    label: "Coding",
+    path: "/coding-dashboard",
+    icon: Code2,
   },
 ];
 

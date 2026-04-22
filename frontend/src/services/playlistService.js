@@ -1,4 +1,5 @@
 import api from "./api";
+import { completeTask } from "./activityService";
 
 export async function getPlaylists() {
   const { data } = await api.get("/playlists");
@@ -35,5 +36,6 @@ export async function importYouTubePlaylist(playlistId, name) {
     playlistId,
     name,
   });
+  completeTask().catch(err => console.error("Streak update error:", err));
   return data;
 }

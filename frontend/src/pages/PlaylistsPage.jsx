@@ -21,6 +21,7 @@ import Button from "../components/common/Button";
 import { getPlaylists } from "../services/playlistService";
 import { getAllProgress } from "../services/progressService";
 import { getDashboardAnalytics } from "../services/analyticsService";
+import { getStreak } from "../services/activityService";
 import {
   getStudyGoals,
   createStudyGoal,
@@ -86,46 +87,7 @@ function normalizeDateKey(dateValue) {
   return `${y}-${m}-${d}`;
 }
 
-function calculateStreak(progressItems = []) {
-  const uniqueDays = Array.from(
-    new Set(
-      progressItems
-        .map((item) => normalizeDateKey(item?.lastWatchedAt || item?.updatedAt))
-        .filter(Boolean)
-    )
-  ).sort((a, b) => new Date(b) - new Date(a));
-
-  if (!uniqueDays.length) return 0;
-
-  const today = new Date();
-  const todayKey = normalizeDateKey(today);
-
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = normalizeDateKey(yesterday);
-
-  if (uniqueDays[0] !== todayKey && uniqueDays[0] !== yesterdayKey) {
-    return 0;
-  }
-
-  let streak = 1;
-  let cursor = new Date(uniqueDays[0]);
-
-  for (let i = 1; i < uniqueDays.length; i += 1) {
-    const prev = new Date(cursor);
-    prev.setDate(prev.getDate() - 1);
-    const prevKey = normalizeDateKey(prev);
-
-    if (uniqueDays[i] === prevKey) {
-      streak += 1;
-      cursor = new Date(uniqueDays[i]);
-    } else if (uniqueDays[i] !== normalizeDateKey(cursor)) {
-      break;
-    }
-  }
-
-  return streak;
-}
+// calculateStreak is now securely handled by the backend API.
 
 function extractWeakTopicLabel(question = "") {
   const cleaned = String(question)
@@ -240,18 +202,19 @@ export default function PlaylistsPage() {
       setGoalsLoading(true);
       setCertificatesLoading(true);
 
-      const [playlistsRes, progressRes, analyticsRes, goalsRes, certificatesRes] =
+      const [playlistsRes, progressRes, analyticsRes, goalsRes, certificatesRes, streakRes] =
         await Promise.all([
           getPlaylists(),
           getAllProgress(),
           getDashboardAnalytics(),
           getStudyGoals(),
           getCertificates(),
+          getStreak()
         ]);
 
       setPlaylists(playlistsRes?.playlists || []);
       setProgressItems(progressRes?.progress || []);
-      setDashboardStats(analyticsRes?.stats || {});
+      setDashboardStats({ ...(analyticsRes?.stats || {}), currentStreak: streakRes?.currentStreak || 0 });
       setGoals(goalsRes?.goals || []);
       setCertificates(certificatesRes?.certificates || []);
       setQuizAttempts(getLocalQuizAttempts());
@@ -381,7 +344,7 @@ export default function PlaylistsPage() {
     const completedPlaylists = playlistTrackers.filter((p) => p.isCompleted).length;
     const inProgressPlaylists = playlistTrackers.filter((p) => p.isInProgress).length;
     const certificateEligible = playlistTrackers.filter((p) => p.isCompleted).length;
-    const streakDays = calculateStreak(progressItems);
+    const streakDays = dashboardStats?.currentStreak || 0;
 
     return {
       totalPlaylists,

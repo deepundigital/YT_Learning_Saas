@@ -1,7 +1,9 @@
 import api from "./api";
+import { completeTask } from "./activityService";
 
 export async function updateVideoProgress(payload) {
   const { data } = await api.post("/progress/update", payload);
+  completeTask().catch(err => console.error("Streak update error:", err));
   return data;
 }
 
