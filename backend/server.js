@@ -11,7 +11,9 @@ const app = createApp();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : ["http://localhost:5173"],
+    origin: process.env.FRONTEND_URL 
+      ? ["http://localhost:5173", process.env.FRONTEND_URL] 
+      : ["http://localhost:5173"],
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -34,8 +36,14 @@ if (process.env.REDIS_URL) {
 const onlineUsers = new Map();
 
 io.use((socket, next) => {
+  console.log("[Socket Middleware] Incoming connection auth:", socket.handshake.auth);
   const userId = socket.handshake.auth?.userId;
-  if (!userId) return next(new Error("Invalid user"));
+  
+  if (!userId) {
+    console.error("[Socket Middleware] Connection rejected: Missing userId");
+    return next(new Error("Invalid user: Missing userId"));
+  }
+  
   socket.userId = userId;
   next();
 });
@@ -55,14 +63,15 @@ io.on("connection", (socket) => {
         content: message,
       });
       
-      console.log("Message sent:", message);
+      console.log("Message sent by", socket.userId, "to", receiverId, ":", message);
 
       const receiverSocketId = onlineUsers.get(receiverId);
-      console.log("Receiver socket:", receiverSocketId);
+      console.log("Receiver socket found:", receiverSocketId ? "YES" : "NO", "(Socket ID:", receiverSocketId, ")");
 
       // SEND TO RECEIVER
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("newMessage", newMessage);
+        console.log("Emitted newMessage to receiver:", receiverId);
       }
 
       // SEND BACK TO SENDER (IMPORTANT)

@@ -102,6 +102,12 @@ lastLoginAt: {
   default: null,
 },
     },
+    codingProfiles: {
+      leetcode: { type: String, default: "" },
+      codeforces: { type: String, default: "" },
+      codechef: { type: String, default: "" },
+      tuf: { type: String, default: "" }
+    },
     lastLoginAt: {
       type: Date,
       default: null

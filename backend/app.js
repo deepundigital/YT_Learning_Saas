@@ -19,6 +19,7 @@ const communityRoutes = require("./routes/community");
 const activityRoutes = require("./routes/activity");
 const taskRoutes = require("./routes/tasks");
 const timetableRoutes = require("./routes/timetable");
+const codingRoutes = require("./routes/coding");
 
 const errorHandler = require("./middleware/errorHandler");
 const env = require("./config/env");
@@ -100,6 +101,7 @@ function createApp() {
   app.use("/api/activity", activityRoutes);
   app.use("/api/tasks", taskRoutes);
   app.use("/api/timetable", timetableRoutes);
+  app.use("/api/coding", codingRoutes);
 
   // legacy compatibility route
   app.post("/api/playlist", async (req, res) => {
