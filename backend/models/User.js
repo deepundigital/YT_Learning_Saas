@@ -21,6 +21,23 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    googleId: {
+      type: String,
+      default: null
+    },
+    authProvider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local"
+    },
+    resetPasswordToken: {
+      type: String,
+      default: null
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: null
+    },
     avatar: {
       type: String,
       default: ""
@@ -79,28 +96,7 @@ const userSchema = new mongoose.Schema(
       xp: {
         type: Number,
         default: 0
-      },
-      googleId: {
-  type: String,
-  default: null,
-},
-authProvider: {
-  type: String,
-  enum: ["local", "google"],
-  default: "local",
-},
-resetPasswordToken: {
-  type: String,
-  default: null,
-},
-resetPasswordExpires: {
-  type: Date,
-  default: null,
-},
-lastLoginAt: {
-  type: Date,
-  default: null,
-},
+      }
     },
     codingProfiles: {
       leetcode: { type: String, default: "" },

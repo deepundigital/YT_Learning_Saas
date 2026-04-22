@@ -1,66 +1,85 @@
-function cleanLine(line) {
-  return String(line || "").replace(/^\s*-\s*/, "").trim();
-}
+/**
+ * Robustly parse JSON from AI response text, handling potential markdown fencing
+ * or leading/trailing text.
+ * @param {string} text - The raw text from AI
+ * @returns {object|null} - Parsed JSON object or null
+ */
+function safeJsonParse(text) {
+  if (!text) return null;
 
-function parseSectionList(text) {
-  return String(text || "")
-    .split("\n")
-    .map((line) => cleanLine(line))
-    .filter(Boolean);
-}
+  const raw = String(text).trim();
 
-function extractSection(raw, startLabel, endLabel = null) {
-  const text = String(raw || "");
-  const start = text.indexOf(startLabel);
+  // 1. Try direct parse
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    // 2. Try extraction from markdown blocks
+    const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fencedMatch?.[1]) {
+      try {
+        return JSON.parse(fencedMatch[1].trim());
+      } catch (e2) {}
+    }
 
-  if (start === -1) return "";
+    // 3. Try finding the first '{' and last '}'
+    const firstBrace = raw.indexOf("{");
+    const lastBrace = raw.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = raw.slice(firstBrace, lastBrace + 1).trim();
+      try {
+        return JSON.parse(candidate);
+      } catch (e3) {}
+    }
+  }
 
-  const from = start + startLabel.length;
-  const sliced = text.slice(from);
-
-  if (!endLabel) return sliced.trim();
-
-  const end = sliced.indexOf(endLabel);
-  if (end === -1) return sliced.trim();
-
-  return sliced.slice(0, end).trim();
+  return null;
 }
 
 function normalizeSummary(raw) {
-  const summary = extractSection(raw, "SUMMARY:", "KEY CONCEPTS:");
-  const keyConcepts = parseSectionList(
-    extractSection(raw, "KEY CONCEPTS:", "IMPORTANT POINTS:")
-  );
-  const importantPoints = parseSectionList(
-    extractSection(raw, "IMPORTANT POINTS:", "REVISION POINTS:")
-  );
-  const revisionPoints = parseSectionList(
-    extractSection(raw, "REVISION POINTS:")
-  );
+  const parsed = safeJsonParse(raw);
 
+  if (parsed) {
+    return {
+      summary: parsed.summary || "",
+      keyConcepts: Array.isArray(parsed.keyConcepts) ? parsed.keyConcepts : [],
+      importantPoints: Array.isArray(parsed.importantPoints) ? parsed.importantPoints : [],
+      revisionPoints: Array.isArray(parsed.revisionPoints) ? parsed.revisionPoints : [],
+      raw
+    };
+  }
+
+  // Fallback if parsing fails (could be old format or non-JSON)
   return {
-    summary,
-    keyConcepts,
-    importantPoints,
-    revisionPoints,
+    summary: "Could not parse AI response",
+    keyConcepts: [],
+    importantPoints: [],
+    revisionPoints: [],
     raw
   };
 }
 
 function normalizeAsk(raw) {
-  const answer = extractSection(raw, "ANSWER:", "CONFIDENCE:");
-  const confidence = extractSection(raw, "CONFIDENCE:", "BASIS:");
-  const basis = extractSection(raw, "BASIS:");
+  const parsed = safeJsonParse(raw);
+
+  if (parsed) {
+    return {
+      answer: String(parsed.answer || "").trim(),
+      confidence: String(parsed.confidence || "").trim().toLowerCase(),
+      basis: String(parsed.basis || "").trim().toLowerCase(),
+      raw
+    };
+  }
 
   return {
-    answer: answer.trim(),
-    confidence: confidence.trim().toLowerCase(),
-    basis: basis.trim().toLowerCase(),
+    answer: "Could not parse AI response",
+    confidence: "low",
+    basis: "unknown",
     raw
   };
 }
 
 module.exports = {
+  safeJsonParse,
   normalizeSummary,
   normalizeAsk
 };

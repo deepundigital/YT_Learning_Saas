@@ -4,6 +4,8 @@ const Note = require("../models/Note");
 const Bookmark = require("../models/Bookmark");
 const StudyGoal = require("../models/StudyGoal");
 const Certificate = require("../models/Certificate");
+const AIInteraction = require("../models/AIInteraction");
+const Video = require("../models/Video");
 
 async function getUserAnalyticsSummary(userId) {
   const [
@@ -13,19 +15,37 @@ async function getUserAnalyticsSummary(userId) {
     totalQuizAttempts,
     totalGoals,
     completedGoals,
-    totalCertificates
+    totalCertificates,
+    totalAIInteractions,
+    totalVideos,
+    recentProgress,
+    recentNotes,
+    recentBookmarks,
+    recentAI
   ] = await Promise.all([
     Progress.aggregate([
-      { $match: { user: userId } },
+      { $match: { userId: userId } },
       {
         $group: {
           _id: null,
           totalTrackedVideos: { $sum: 1 },
           completedVideos: {
-            $sum: { $cond: [{ $eq: ["$isCompleted", true] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] }
           },
-          totalWatchTimeSec: { $sum: "$watchedSeconds" },
-          averageCompletionPercent: { $avg: "$completionPercent" }
+          totalWatchTimeSec: { $sum: "$watchTimeSec" },
+          averageCompletionPercent: {
+            $avg: {
+              $multiply: [
+                {
+                  $divide: [
+                    "$lastPositionSec",
+                    { $cond: [{ $gt: ["$durationSec", 0] }, "$durationSec", 1] }
+                  ]
+                },
+                100
+              ]
+            }
+          }
         }
       }
     ]),
@@ -33,8 +53,14 @@ async function getUserAnalyticsSummary(userId) {
     Bookmark.countDocuments({ user: userId }),
     QuizAttempt.countDocuments({ user: userId }),
     StudyGoal.countDocuments({ user: userId }),
-    StudyGoal.countDocuments({ user: userId, isCompleted: true }),
-    Certificate.countDocuments({ user: userId })
+    StudyGoal.countDocuments({ user: userId, status: "completed" }),
+    Certificate.countDocuments({ user: userId }),
+    AIInteraction.countDocuments({ user: userId }),
+    Video.countDocuments({}),
+    Progress.find({ userId: userId }).sort({ lastWatchedAt: -1 }).limit(10),
+    Note.find({ user: userId }).sort({ createdAt: -1 }).limit(10),
+    Bookmark.find({ user: userId }).sort({ createdAt: -1 }).limit(10),
+    AIInteraction.find({ user: userId }).sort({ createdAt: -1 }).limit(10)
   ]);
 
   const base = progressSummary[0] || {
@@ -44,7 +70,7 @@ async function getUserAnalyticsSummary(userId) {
     averageCompletionPercent: 0
   };
 
-  return {
+  const stats = {
     ...base,
     averageCompletionPercent: Math.round(base.averageCompletionPercent || 0),
     totalNotes,
@@ -52,8 +78,19 @@ async function getUserAnalyticsSummary(userId) {
     totalQuizAttempts,
     totalGoals,
     completedGoals,
-    totalCertificates
+    totalCertificates,
+    totalAIInteractions,
+    totalVideos
   };
+
+  const recent = {
+    progress: recentProgress,
+    notes: recentNotes,
+    bookmarks: recentBookmarks,
+    ai: recentAI
+  };
+
+  return { stats, recent };
 }
 
 module.exports = {

@@ -27,11 +27,12 @@ export default function CommunityPage() {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     const id = user._id || user.id;
+    const token = localStorage.getItem("token");
     setCurrentUser({ ...user, id, _id: id });
 
     // Initialize socket
     const newSocket = io(SOCKET_URL, {
-      auth: { userId: id },
+      auth: { userId: id, token },
       transports: ["websocket"],
       withCredentials: true
     });

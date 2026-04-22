@@ -12,7 +12,7 @@ function buildSummaryPrompt({ video, transcriptText }) {
     {
       role: "system",
       content:
-        "You are an AI learning assistant for coding and educational videos. Return concise structured study notes in clear English. Keep output practical and student-friendly."
+        "You are an AI learning assistant for coding and educational videos. Return concise structured study notes in valid JSON only. Keep output practical and student-friendly."
     },
     {
       role: "user",
@@ -26,25 +26,13 @@ Description: ${description}
 
 ${sourceText}
 
-Return output in exactly this format:
-
-SUMMARY:
-<short paragraph>
-
-KEY CONCEPTS:
-- ...
-- ...
-- ...
-
-IMPORTANT POINTS:
-- ...
-- ...
-- ...
-
-REVISION POINTS:
-- ...
-- ...
-- ...
+Return ONLY valid JSON in this structure:
+{
+  "summary": "short paragraph summarizing the video",
+  "keyConcepts": ["concept 1", "concept 2", ...],
+  "importantPoints": ["point 1", "point 2", ...],
+  "revisionPoints": ["point 1", "point 2", ...]
+}
       `.trim()
     }
   ];
