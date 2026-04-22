@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { io } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, UserCheck, UserPlus, Search, MessageSquare, Loader2, Info, Flame, Trophy } from "lucide-react";
@@ -24,6 +24,11 @@ export default function CommunityPage() {
   const [socket, setSocket] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]); // List of user IDs
+  const selectedChatUserRef = useRef(null);
+
+  useEffect(() => {
+    selectedChatUserRef.current = selectedChatUser;
+  }, [selectedChatUser]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -56,14 +61,8 @@ export default function CommunityPage() {
 
     newSocket.on("newMessage", (msg) => {
       setMessages((prev) => {
-        // Only add if message belongs to the selected chat user
-        // (Either I sent it to them, or they sent it to me)
-        const isFromSelected = msg.sender === selectedChatUser?._id || msg.receiver === selectedChatUser?._id;
-        
-        // OR if it's my own message (though handleSendMessage might already add it)
-        // Actually, the server sends newMessage to BOTH sender and receiver.
-        
-        if (selectedChatUser && (msg.sender === selectedChatUser._id || msg.receiver === selectedChatUser._id)) {
+        const currentChatUser = selectedChatUserRef.current;
+        if (currentChatUser && (msg.sender === currentChatUser._id || msg.receiver === currentChatUser._id)) {
            return [...prev, msg];
         }
         return prev;
