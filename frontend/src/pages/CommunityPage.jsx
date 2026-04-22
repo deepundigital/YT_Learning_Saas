@@ -60,20 +60,24 @@ export default function CommunityPage() {
     });
 
     newSocket.on("newMessage", (msg) => {
-      console.log("[Socket] Received message:", msg);
+      console.log("[Socket] Incoming message for processing:", msg);
+      
       setMessages((prev) => {
         const currentChatUser = selectedChatUserRef.current;
         if (!currentChatUser) return prev;
 
-        // Force string comparison for safety
-        const senderId = String(msg.sender?._id || msg.sender);
-        const receiverId = String(msg.receiver?._id || msg.receiver);
-        const chatWithId = String(currentChatUser._id || currentChatUser.id);
+        // Normalize IDs for comparison
+        const msgSender = String(msg.sender?._id || msg.sender);
+        const msgReceiver = String(msg.receiver?._id || msg.receiver);
+        const activeChatId = String(currentChatUser._id || currentChatUser.id);
 
-        // If the message is part of our current open chat, add it
-        if (senderId === chatWithId || receiverId === chatWithId) {
+        // Does this message belong to the active conversation?
+        if (msgSender === activeChatId || msgReceiver === activeChatId) {
+           console.log("[Socket] Message added to UI state");
            return [...prev, msg];
         }
+        
+        console.log("[Socket] Message ignored (not for active chat)");
         return prev;
       });
     });

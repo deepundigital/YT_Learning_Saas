@@ -62,8 +62,11 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  console.log(`[Socket] User joined: ${socket.userId} (Socket: ${socket.id})`);
-  onlineUsers.set(socket.userId, socket.id);
+  const userId = String(socket.userId);
+  console.log(`[Socket] User joined: ${userId} (Socket: ${socket.id})`);
+  
+  // Update with the latest socket ID for this user
+  onlineUsers.set(userId, socket.id);
   
   const onlineIds = Array.from(onlineUsers.keys());
   io.emit("onlineUsers", onlineIds);
@@ -72,25 +75,31 @@ io.on("connection", (socket) => {
   socket.on("sendMessage", async ({ receiverId, message }) => {
     try {
       const receiverIdStr = String(receiverId);
+      const senderIdStr = String(socket.userId);
+
       const newMessage = await Message.create({
-        sender: socket.userId,
+        sender: senderIdStr,
         receiver: receiverIdStr,
         content: message,
       });
       
-      console.log(`[Message] ${socket.userId} -> ${receiverIdStr}: "${message}"`);
+      console.log(`[Message] ${senderIdStr} -> ${receiverIdStr}: "${message}"`);
+
+      const messageData = newMessage.toObject();
+      // Ensure sender and receiver IDs are strings in the emitted object
+      messageData.sender = String(messageData.sender);
+      messageData.receiver = String(messageData.receiver);
 
       const receiverSocketId = onlineUsers.get(receiverIdStr);
-      const messageData = newMessage.toObject();
       
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("newMessage", messageData);
-        console.log(`[Socket] Delivered to socket: ${receiverSocketId}`);
+        console.log(`[Socket] Delivered to receiver socket: ${receiverSocketId}`);
       } else {
-        console.log(`[Socket] Receiver ${receiverIdStr} is OFFLINE. Saved to DB only.`);
+        console.log(`[Socket] Receiver ${receiverIdStr} is OFFLINE.`);
       }
 
-      // SEND BACK TO SENDER
+      // ALWAYS send back to sender so their UI updates
       socket.emit("newMessage", messageData);
     } catch (err) {
       console.error("[Socket] Message error:", err);
