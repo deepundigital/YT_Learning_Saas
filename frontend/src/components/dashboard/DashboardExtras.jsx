@@ -7,17 +7,17 @@ import TimetableSystem from "./TimetableSystem";
 function SectionCard({ title, icon: Icon, children, className = "" }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14 }}
+      initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5 }}
-      className={`rounded-[1.5rem] border border-white/5 bg-white/[0.015] p-6 shadow-sm flex flex-col ${className}`}
+      className={`glass premium-border rounded-[2rem] p-6 flex flex-col ${className}`}
     >
       <div className="mb-4 flex items-center gap-3">
         <div className="rounded-xl bg-white/5 p-2">
-          <Icon className="text-brand" size={18} />
+          <Icon className="text-blue-300" size={18} />
         </div>
-        <h3 className="text-lg font-bold tracking-tight">{title}</h3>
+        <h3 className="text-lg font-bold">{title}</h3>
       </div>
       <div className="flex-1 min-h-0">
         {children}
