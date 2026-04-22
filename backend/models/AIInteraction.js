@@ -10,12 +10,12 @@ const aiInteractionSchema = new mongoose.Schema(
     },
     youtubeId: {
       type: String,
-      required: true,
+      required: false,
       index: true
     },
     type: {
       type: String,
-      enum: ["summary", "ask", "quiz"],
+      enum: ["summary", "ask", "quiz", "assignment"],
       required: true,
       index: true
     },

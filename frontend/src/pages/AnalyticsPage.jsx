@@ -376,8 +376,8 @@ export default function AnalyticsPage() {
               </div>
             }
           >
-            <div className="h-[320px] min-h-[320px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={320}>
+            <div className="h-[300px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={
                     progressByDay.length
@@ -425,8 +425,8 @@ export default function AnalyticsPage() {
             title="Playlist Completion"
             subtitle="How far each playlist has progressed"
           >
-            <div className="h-[320px] min-h-[320px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={320}>
+            <div className="h-[300px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={
                     playlistProgressData.length

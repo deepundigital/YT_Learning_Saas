@@ -32,8 +32,8 @@ export default function AssignmentSolverPage() {
   };
 
   const handleGenerate = async () => {
-    if (!file) {
-      setError("Please upload an assignment file first.");
+    if (!file && !instructions.trim()) {
+      setError("Please upload a file or provide instructions.");
       return;
     }
 
@@ -42,32 +42,35 @@ export default function AssignmentSolverPage() {
     setSolution("");
 
     try {
-      // Simulate file content reading for now since we don't have a real file parser backend
-      // In a real app, you'd extract text from PDF/Images or send the file to backend
-      // For this implementation, I'll send a placeholder "Reading file..." or try to read text if it's .txt
-      let content = "File Uploaded: " + file.name;
-      
-      if (file.type === "text/plain") {
-        content = await file.text();
+      const formData = new FormData();
+      if (file) {
+        formData.append("assignment", file);
+      }
+      if (instructions) {
+        formData.append("instructions", instructions);
       }
 
-      const response = await axios.post(`${API_BASE}/ai/solve-assignment`, {
-        content,
-        instructions
-      }, {
+      console.log("Status: Sending assignment to backend...");
+      
+      const response = await axios.post(`${API_BASE}/ai/solve-assignment`, formData, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "multipart/form-data",
         }
       });
 
-      if (response.data.ok) {
+      if (response.data.success) {
+        console.log("Success: Solution received.");
         setSolution(response.data.solution);
       } else {
-        setError(response.data.error || "Failed to generate solution.");
+        const errorMsg = response.data.error || response.data.message || "Failed to generate solution.";
+        console.warn("Backend Error:", errorMsg);
+        setError(errorMsg);
       }
     } catch (err) {
-      console.error("Assignment solver error:", err);
-      setError(err.response?.data?.error || "Something went wrong while processing your assignment.");
+      console.error("Assignment Solver Client Error:", err);
+      const serverError = err.response?.data?.error || err.response?.data?.message || "Failed to connect to the assignment solver service.";
+      setError(serverError);
     } finally {
       setLoading(false);
     }
