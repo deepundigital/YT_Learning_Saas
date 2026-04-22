@@ -430,6 +430,10 @@ export default function DashboardPage() {
     return quotes[Math.floor(Math.random() * quotes.length)];
   }, []);
 
+  const weakTopics = useMemo(() => {
+    return deriveWeakTopics(quizAttempts);
+  }, [quizAttempts]);
+
   return (
     <div className="min-h-screen text-[var(--text)]">
       <div className="section-container py-6 md:py-8">
