@@ -11,7 +11,8 @@ export async function updateCodingProfiles(profiles) {
     {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`
-      }
+      },
+      withCredentials: true
     }
   );
   return data;

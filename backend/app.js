@@ -53,9 +53,29 @@ function createApp() {
   );
 
   app.use(cors({
-    origin: [env.FRONTEND_URL, "http://localhost:5173", "https://yt-learning-saas.vercel.app"],
+    origin: [
+      "http://localhost:5173",
+      "https://yt-learning-saas.vercel.app",
+      env.FRONTEND_URL
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true
   }));
+
+  app.options("*", cors());
+
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "https://yt-learning-saas.vercel.app");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+
+    next();
+  });
 
   app.use((req, res, next) => {
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
