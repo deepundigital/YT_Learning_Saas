@@ -12,7 +12,7 @@ function buildAskPrompt({ video, transcriptText, question }) {
     {
       role: "system",
       content:
-        "You are an AI learning assistant for educational and coding videos. Answer clearly, honestly, and in a student-friendly way. If transcript is missing, say the answer is based on video metadata and may be limited."
+        "You are an AI learning assistant for educational and coding videos. Answer clearly, honestly, and in a student-friendly way. Return ONLY valid JSON output."
     },
     {
       role: "user",
@@ -29,16 +29,12 @@ ${sourceText}
 User Question:
 ${question}
 
-Return output in exactly this format:
-
-ANSWER:
-<clear answer>
-
-CONFIDENCE:
-<high/medium/low>
-
-BASIS:
-<transcript or metadata>
+Return ONLY valid JSON in this structure:
+{
+  "answer": "clear answer",
+  "confidence": "high/medium/low",
+  "basis": "transcript or metadata"
+}
       `.trim()
     }
   ];

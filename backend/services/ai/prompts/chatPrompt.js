@@ -18,7 +18,7 @@ function buildChatPrompt({ video, transcriptText, history, question }) {
     {
       role: "system",
       content:
-        "You are an AI tutor for educational and coding videos. Answer clearly, practically, and in a student-friendly way. Keep answers grounded in the provided transcript or metadata. If transcript is missing, say the answer is based on metadata and may be limited."
+        "You are an AI tutor for educational and coding videos. Answer clearly, practically, and in a student-friendly way. Return ONLY valid JSON output."
     },
     {
       role: "user",
@@ -36,16 +36,12 @@ ${historyText}
 User Question:
 ${question}
 
-Return output in exactly this format:
-
-ANSWER:
-<clear helpful answer>
-
-CONFIDENCE:
-<high/medium/low>
-
-BASIS:
-<transcript or metadata>
+Return ONLY valid JSON in this structure:
+{
+  "answer": "clear helpful answer",
+  "confidence": "high/medium/low",
+  "basis": "transcript or metadata"
+}
       `.trim()
     }
   ];

@@ -104,57 +104,14 @@ function createApp() {
   // legacy compatibility route
   app.post("/api/playlist", async (req, res) => {
     try {
-      let { playlistId, pageToken } = req.body || {};
+      const { getPlaylistVideos } = require("./services/youtubeService");
+      const { playlistId, pageToken } = req.body || {};
 
-      playlistId = sanitizePlaylistId(playlistId);
-      pageToken = (pageToken && String(pageToken).trim()) || "";
-
-      if (!playlistId) {
-        return res.status(400).json({
-          ok: false,
-          error: "playlistId is required"
-        });
-      }
-
-      if (!env.YOUTUBE_API_KEY) {
-        return res.status(500).json({
-          ok: false,
-          error: "YOUTUBE_API_KEY missing in backend/.env"
-        });
-      }
-
-      const response = await axios.get(
-        "https://www.googleapis.com/youtube/v3/playlistItems",
-        {
-          params: {
-            part: "snippet",
-            maxResults: 50,
-            playlistId,
-            pageToken,
-            key: env.YOUTUBE_API_KEY
-          },
-          timeout: 15000
-        }
-      );
-
-      const items = (response.data.items || [])
-        .map((item) => ({
-          id: item?.snippet?.resourceId?.videoId,
-          title: item?.snippet?.title
-        }))
-        .filter(
-          (v) =>
-            v.id &&
-            v.title &&
-            v.title !== "Private video" &&
-            v.title !== "Deleted video"
-        );
+      const result = await getPlaylistVideos(playlistId, pageToken);
 
       return res.json({
         ok: true,
-        playlistId,
-        videos: items,
-        nextPageToken: response.data.nextPageToken || null
+        ...result
       });
     } catch (err) {
       const msg = youtubeErrorToMessage(err);

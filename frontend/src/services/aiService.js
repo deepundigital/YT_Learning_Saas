@@ -55,48 +55,21 @@ export async function chatWithAi(videoId, question) {
   return data;
 }
 
-/*
-  Temporary stable fallback:
-  Quiz attempts ko localStorage me per-user + per-video scope ke saath store kar rahe hain,
-  taaki app crash na kare aur fresh account me old attempts bleed na hon.
-*/
 export async function saveQuizAttempt({ youtubeId, title, answers }) {
-  const key = quizStorageKey(youtubeId);
-  const existing = JSON.parse(localStorage.getItem(key) || "[]");
-
-  const safeAnswers = Array.isArray(answers) ? answers : [];
-  const totalQuestions = safeAnswers.length;
-  const correctAnswers = safeAnswers.filter((item) => item?.isCorrect).length;
-  const scorePercent = totalQuestions
-    ? Math.round((correctAnswers / totalQuestions) * 100)
-    : 0;
-
-  const attempt = {
-    _id: `${Date.now()}`,
+  const { data } = await api.post(`/ai/quiz-attempt`, {
     youtubeId,
-    title: title || "Quiz Attempt",
-    answers: safeAnswers,
-    totalQuestions,
-    correctAnswers,
-    scorePercent,
-    createdAt: new Date().toISOString(),
-  };
-
-  const next = [attempt, ...existing];
-  localStorage.setItem(key, JSON.stringify(next));
-
-  return {
-    ok: true,
-    attempt,
-  };
+    title,
+    answers,
+  });
+  return data;
 }
 
 export async function getQuizAttempts(youtubeId) {
-  const key = quizStorageKey(youtubeId);
-  const attempts = JSON.parse(localStorage.getItem(key) || "[]");
+  const { data } = await api.get(`/ai/quiz-attempts/${youtubeId}`);
+  return data;
+}
 
-  return {
-    ok: true,
-    attempts,
-  };
+export async function getAllQuizAttempts() {
+  const { data } = await api.get(`/ai/quiz-attempts`);
+  return data;
 }
