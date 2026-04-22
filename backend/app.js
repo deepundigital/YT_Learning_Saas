@@ -53,11 +53,7 @@ function createApp() {
   );
 
   app.use(cors({
-    origin: [
-      "http://localhost:5173",
-      "https://yt-learning-saas.vercel.app",
-      env.FRONTEND_URL
-    ],
+    origin: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true
   }));
