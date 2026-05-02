@@ -102,6 +102,8 @@ const userSchema = new mongoose.Schema(
     codeforces: { type: String, default: "" },
     codechef: { type: String, default: "" },
     tuf: { type: String, default: "" },
+    codingAiFeedback: { type: String, default: "" },
+    codingAiFeedbackUpdatedAt: { type: Date, default: null },
     lastLoginAt: {
       type: Date,
       default: null

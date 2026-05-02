@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+yt-dlp
+python-multipart
+starlette
+itsdangerous
+python-jose[cryptography]

@@ -67,6 +67,8 @@ import {
   createRevisionFromBookmarks,
 } from "../services/revisionService";
 
+import { getDownloadLink } from "../services/downloadService";
+
 function StatChip({ icon: Icon, label, value }) {
   return (
     <motion.div
@@ -221,6 +223,7 @@ export default function WorkspacePage() {
 
   const [importOpen, setImportOpen] = useState(true);
   const [videoAddOpen, setVideoAddOpen] = useState(false);
+  const [downloadHistoryOpen, setDownloadHistoryOpen] = useState(false);
 
   const [notice, setNotice] = useState(null);
 
@@ -232,6 +235,46 @@ export default function WorkspacePage() {
   });
 
   const [videoProgress, setVideoProgress] = useState(null);
+
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [downloadHistory, setDownloadHistory] = useState([]);
+
+  useEffect(() => {
+    const history = JSON.parse(localStorage.getItem("download_history") || "[]");
+    setDownloadHistory(history);
+  }, []);
+
+  const handleDownload = async () => {
+    if (!videoId) return;
+
+    try {
+      setDownloadLoading(true);
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      const res = await getDownloadLink(url);
+
+      if (res?.download_url) {
+        // Trigger direct download
+        const link = document.createElement("a");
+        link.href = res.download_url;
+        link.setAttribute("download", `${res.title || "video"}.mp4`);
+        link.setAttribute("target", "_blank");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Update local history state
+        const updatedHistory = JSON.parse(localStorage.getItem("download_history") || "[]");
+        setDownloadHistory(updatedHistory);
+
+        showNotice("success", "Download started! Direct link opened.");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      showNotice("error", error.message || "Download failed.");
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
 
   const playerHostRef = useRef(null);
   const playerRef = useRef(null);
@@ -1249,6 +1292,15 @@ export default function WorkspacePage() {
             >
               Copy workspace link
             </button>
+
+            <button
+              onClick={handleDownload}
+              disabled={downloadLoading || !videoId}
+              className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Download size={16} />
+              {downloadLoading ? "Processing..." : "Download Video"}
+            </button>
           </div>
         </motion.div>
 
@@ -1490,6 +1542,41 @@ export default function WorkspacePage() {
                   >
                     {videoAddLoading ? "Adding..." : "Add Video"}
                   </button>
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+
+          <SectionToggle
+            title="Download History"
+            subtitle={`${downloadHistory.length} recently downloaded`}
+            icon={Clock3}
+            open={downloadHistoryOpen}
+            onClick={() => setDownloadHistoryOpen((prev) => !prev)}
+          />
+
+          <AnimatePresence>
+            {downloadHistoryOpen ? (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -8 }}
+                animate={{ opacity: 1, height: "auto", y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -8 }}
+                className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/5 p-4"
+              >
+                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  {downloadHistory.length ? (
+                    downloadHistory.map((item, idx) => (
+                      <div key={idx} className="flex gap-3 items-center">
+                        <img src={item.thumbnail} className="w-12 h-12 rounded-lg object-cover" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">{item.title}</p>
+                          <p className="text-[10px] text-muted">{new Date(item.timestamp).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted">No download history.</p>
+                  )}
                 </div>
               </motion.div>
             ) : null}

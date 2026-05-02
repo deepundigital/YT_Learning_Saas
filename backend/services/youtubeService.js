@@ -29,39 +29,47 @@ async function getVideoMetadata(videoId) {
   }
 
   if (!env.YOUTUBE_API_KEY) {
-    throw new Error("YOUTUBE_API_KEY missing in .env");
+    console.error("YOUTUBE_API_KEY is missing in environment variables");
+    throw new Error("YouTube API configuration missing (API Key)");
   }
 
-  const response = await axios.get("https://www.googleapis.com/youtube/v3/videos", {
-    params: {
-      part: "snippet,contentDetails",
-      id: cleanVideoId,
-      key: env.YOUTUBE_API_KEY
-    },
-    timeout: 15000
-  });
+  try {
+    const response = await axios.get("https://www.googleapis.com/youtube/v3/videos", {
+      params: {
+        part: "snippet,contentDetails",
+        id: cleanVideoId,
+        key: env.YOUTUBE_API_KEY
+      },
+      timeout: 15000
+    });
 
-  const item = response.data?.items?.[0];
+    const item = response.data?.items?.[0];
 
-  if (!item) {
-    throw new Error("Video not found");
+    if (!item) {
+      throw new Error("Video not found on YouTube");
+    }
+
+    return {
+      youtubeId: cleanVideoId,
+      title: item.snippet?.title || "",
+      description: item.snippet?.description || "",
+      channelTitle: item.snippet?.channelTitle || "",
+      publishedAt: item.snippet?.publishedAt || null,
+      thumbnails: {
+        default: item.snippet?.thumbnails?.default?.url || "",
+        medium: item.snippet?.thumbnails?.medium?.url || "",
+        high: item.snippet?.thumbnails?.high?.url || ""
+      },
+      duration: item.contentDetails?.duration || "",
+      durationSec: parseISODurationToSeconds(item.contentDetails?.duration || ""),
+      tags: item.snippet?.tags || []
+    };
+  } catch (err) {
+    const status = err.response?.status;
+    const msg = err.response?.data?.error?.message || err.message;
+    console.error(`YouTube API Error [${status}]: ${msg}`);
+    throw new Error(`YouTube Metadata Error: ${msg}`);
   }
-
-  return {
-    youtubeId: cleanVideoId,
-    title: item.snippet?.title || "",
-    description: item.snippet?.description || "",
-    channelTitle: item.snippet?.channelTitle || "",
-    publishedAt: item.snippet?.publishedAt || null,
-    thumbnails: {
-      default: item.snippet?.thumbnails?.default?.url || "",
-      medium: item.snippet?.thumbnails?.medium?.url || "",
-      high: item.snippet?.thumbnails?.high?.url || ""
-    },
-    duration: item.contentDetails?.duration || "",
-    durationSec: parseISODurationToSeconds(item.contentDetails?.duration || ""),
-    tags: item.snippet?.tags || []
-  };
 }
 
 async function getPlaylistVideos(playlistId, pageToken = "") {
@@ -72,79 +80,102 @@ async function getPlaylistVideos(playlistId, pageToken = "") {
   }
 
   if (!env.YOUTUBE_API_KEY) {
-    throw new Error("YOUTUBE_API_KEY missing in .env");
+    console.error("YOUTUBE_API_KEY is missing in environment variables");
+    throw new Error("YouTube API configuration missing (API Key)");
   }
 
-  const response = await axios.get(
-    "https://www.googleapis.com/youtube/v3/playlistItems",
-    {
-      params: {
-        part: "snippet",
-        maxResults: 50,
-        playlistId: cleanPlaylistId,
-        pageToken: String(pageToken || "").trim(),
-        key: env.YOUTUBE_API_KEY
-      },
-      timeout: 15000
-    }
-  );
-
-  const videos = (response.data?.items || [])
-    .map((item) => ({
-      videoId: item?.snippet?.resourceId?.videoId || "",
-      title: item?.snippet?.title || "",
-      thumbnail:
-        item?.snippet?.thumbnails?.medium?.url ||
-        item?.snippet?.thumbnails?.default?.url ||
-        ""
-    }))
-    .filter(
-      (v) =>
-        v.videoId &&
-        v.title &&
-        v.title !== "Private video" &&
-        v.title !== "Deleted video"
+  try {
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/playlistItems",
+      {
+        params: {
+          part: "snippet",
+          maxResults: 50,
+          playlistId: cleanPlaylistId,
+          pageToken: String(pageToken || "").trim(),
+          key: env.YOUTUBE_API_KEY
+        },
+        timeout: 15000
+      }
     );
 
-  return {
-    playlistId: cleanPlaylistId,
-    videos,
-    nextPageToken: response.data?.nextPageToken || null
-  };
+    const videos = (response.data?.items || [])
+      .map((item) => ({
+        videoId: item?.snippet?.resourceId?.videoId || "",
+        title: item?.snippet?.title || "",
+        thumbnail:
+          item?.snippet?.thumbnails?.medium?.url ||
+          item?.snippet?.thumbnails?.default?.url ||
+          ""
+      }))
+      .filter(
+        (v) =>
+          v.videoId &&
+          v.title &&
+          v.title !== "Private video" &&
+          v.title !== "Deleted video"
+      );
+
+    return {
+      playlistId: cleanPlaylistId,
+      videos,
+      nextPageToken: response.data?.nextPageToken || null
+    };
+  } catch (err) {
+    const status = err.response?.status;
+    const msg = err.response?.data?.error?.message || err.message;
+    console.error(`YouTube API Error [${status}]: ${msg}`);
+    throw new Error(`YouTube Playlist Error: ${msg}`);
+  }
 }
 
 async function searchYouTube(query, type = "playlist", maxResults = 10) {
   if (!query) throw new Error("Search query required");
 
   if (!env.YOUTUBE_API_KEY) {
-    throw new Error("YOUTUBE_API_KEY missing in .env");
+    console.error("YOUTUBE_API_KEY is missing in environment variables");
+    throw new Error("YouTube API configuration missing (API Key)");
   }
 
-  const response = await axios.get("https://www.googleapis.com/youtube/v3/search", {
-    params: {
-      part: "snippet",
-      q: `${query} tutorial course`, // Adding 'tutorial course' to narrow down results to educational content
-      type: type, // 'playlist' or 'video'
-      maxResults,
-      key: env.YOUTUBE_API_KEY,
-      ...(type === "video" ? { videoEmbeddable: "true" } : {})
-    },
-    timeout: 15000
-  });
+  try {
+    const response = await axios.get("https://www.googleapis.com/youtube/v3/search", {
+      params: {
+        part: "snippet",
+        q: `${query} tutorial course`, // Adding 'tutorial course' to narrow down results to educational content
+        type: type, // 'playlist' or 'video'
+        maxResults,
+        key: env.YOUTUBE_API_KEY,
+        ...(type === "video" ? { videoEmbeddable: "true" } : {})
+      },
+      timeout: 15000
+    });
 
-  return (response.data?.items || []).map((item) => ({
-    id: type === "playlist" ? item.id.playlistId : item.id.videoId,
-    type,
-    title: item.snippet?.title || "",
-    description: item.snippet?.description || "",
-    channelTitle: item.snippet?.channelTitle || "",
-    publishedAt: item.snippet?.publishedAt || null,
-    thumbnail:
-      item.snippet?.thumbnails?.high?.url ||
-      item.snippet?.thumbnails?.medium?.url ||
-      item.snippet?.thumbnails?.default?.url ||
-      ""
-  }));
+    return (response.data?.items || []).map((item) => {
+      let id = "";
+      if (type === "playlist") id = item.id?.playlistId;
+      else if (type === "video") id = item.id?.videoId;
+      else id = item.id?.videoId || item.id?.playlistId || item.id?.channelId;
+
+      return {
+        id: id || "",
+        type,
+        title: item.snippet?.title || "",
+        description: item.snippet?.description || "",
+        channelTitle: item.snippet?.channelTitle || "",
+        publishedAt: item.snippet?.publishedAt || null,
+        thumbnail:
+          item.snippet?.thumbnails?.high?.url ||
+          item.snippet?.thumbnails?.medium?.url ||
+          item.snippet?.thumbnails?.default?.url ||
+          ""
+      };
+    }).filter(item => item.id);
+  } catch (err) {
+    const status = err.response?.status;
+    const msg = err.response?.data?.error?.message || err.message;
+    console.error(`YouTube API Search Error [${status}]: ${msg}`);
+    throw new Error(`YouTube Search Error: ${msg}`);
+  }
 }
 
 module.exports = {

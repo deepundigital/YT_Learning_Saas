@@ -73,11 +73,18 @@ export default function CodingDashboardPage() {
 
   const loadData = async () => {
     setLoading(true);
-    await fetchStats();
-    await fetchTodayActivity();
-    await fetchSocialLeaderboard();
-    await fetchContestsList();
-    setLoading(false);
+    try {
+      await Promise.all([
+        fetchStats(),
+        fetchTodayActivity(),
+        fetchSocialLeaderboard(),
+        fetchContestsList()
+      ]);
+    } catch (err) {
+      console.error("Failed to load dashboard data", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchTodayActivity = async () => {

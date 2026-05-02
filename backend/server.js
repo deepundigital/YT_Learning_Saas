@@ -131,6 +131,12 @@ initCron(io);
 console.log("==== DEBUG START ====");
 console.log("MONGO_URI:", process.env.MONGO_URI ? "Defined" : "MISSING");
 console.log("PORT:", process.env.PORT);
+if (process.env.YOUTUBE_API_KEY) {
+  const key = process.env.YOUTUBE_API_KEY;
+  console.log("YOUTUBE_API_KEY: Defined", `(${key.substring(0, 5)}...${key.substring(key.length - 4)})`);
+} else {
+  console.log("YOUTUBE_API_KEY: MISSING");
+}
 console.log("==== DEBUG END ====");
 
 async function startServer() {
