@@ -52,10 +52,27 @@ function createApp() {
     })
   );
 
+  const allowedOrigins = [
+    env.FRONTEND_URL,
+    "https://yt-learning-saas.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000"
+  ];
+
   app.use(cors({
-    origin: true,
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.endsWith(".vercel.app")) {
+        callback(null, true);
+      } else {
+        console.warn("CORS blocked origin:", origin);
+        callback(null, false); // Instead of error, return false to let it fail naturally
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
   }));
 
   app.options("*", cors());

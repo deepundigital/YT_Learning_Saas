@@ -4,6 +4,8 @@ const {
   fetchLeetCodeStats,
   fetchCodeforcesStats,
   fetchCodeChefStats,
+  fetchGfgStats,
+  fetchCodingNinjasStats,
   fetchContests
 } = require("../services/codingService");
 const { analyzeCodingStats } = require("../services/ai/aiProvider");
@@ -12,16 +14,16 @@ const getTodayDateString = () => new Date().toISOString().split("T")[0];
 
 exports.updateProfiles = async (req, res, next) => {
   try {
-    console.log("req.user:", req.user);
-    console.log("Finding user with ID:", req.user.id);
     const userId = req.user.id;
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    user.leetcode = req.body.leetcode;
-    user.codeforces = req.body.codeforces;
-    user.codechef = req.body.codechef;
+    if (req.body.leetcode !== undefined) user.leetcode = req.body.leetcode;
+    if (req.body.codeforces !== undefined) user.codeforces = req.body.codeforces;
+    if (req.body.codechef !== undefined) user.codechef = req.body.codechef;
+    if (req.body.gfg !== undefined) user.gfg = req.body.gfg;
+    if (req.body.codingninjas !== undefined) user.codingninjas = req.body.codingninjas;
     if (req.body.tuf !== undefined) user.tuf = req.body.tuf;
 
     await user.save();
@@ -32,12 +34,18 @@ exports.updateProfiles = async (req, res, next) => {
   }
 };
 
+exports.updateStrategy = async (req, res, next) => {
+  try {
+    const { strategy } = req.body;
+    const user = await User.findByIdAndUpdate(req.user.id, { codingStrategy: strategy }, { new: true });
+    res.json({ success: true, strategy: user.codingStrategy });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.getTrackerStats = async (req, res, next) => {
   try {
-    console.log("req.user:", req.user);
-    console.log("Finding user with ID:", req.user.id);
-    
-    // Always use req.user.id to fetch the logged-in user's info for "me"
     let userId = req.params.userId === "me" ? req.user.id : req.params.userId;
     
     const user = await User.findById(userId);
@@ -47,13 +55,19 @@ exports.getTrackerStats = async (req, res, next) => {
       leetcode: user.leetcode || "",
       codeforces: user.codeforces || "",
       codechef: user.codechef || "",
+      gfg: user.gfg || "",
+      codingninjas: user.codingninjas || "",
       tuf: user.tuf || ""
     };
     
-    const [leetcodeStats, codeforcesStats, codechefStats] = await Promise.all([
+    // We use a promise wrapper that resolves quickly if data is in cache
+    // or waits if it's the first time.
+    const [leetcodeStats, codeforcesStats, codechefStats, gfgStats, cnStats] = await Promise.all([
       user.leetcode ? fetchLeetCodeStats(user.leetcode) : null,
       user.codeforces ? fetchCodeforcesStats(user.codeforces) : null,
-      user.codechef ? fetchCodeChefStats(user.codechef) : null
+      user.codechef ? fetchCodeChefStats(user.codechef) : null,
+      user.gfg ? fetchGfgStats(user.gfg) : null,
+      user.codingninjas ? fetchCodingNinjasStats(user.codingninjas) : null
     ]);
 
     // Compute streak
@@ -62,11 +76,10 @@ exports.getTrackerStats = async (req, res, next) => {
     let longestStreak = 0;
     
     if (activities.length > 0) {
-      const dates = activities.map(a => a.date);
-      const uniqueDates = [...new Set(dates)].sort((a,b) => new Date(b) - new Date(a));
+      const uniqueDates = [...new Set(activities.map(a => a.date))].sort((a,b) => b.localeCompare(a));
       
       const todayStr = getTodayDateString();
-      let yesterday = new Date(todayStr);
+      let yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split("T")[0];
 
@@ -75,7 +88,8 @@ exports.getTrackerStats = async (req, res, next) => {
         let cursor = new Date(uniqueDates[0]);
         for (let i = 1; i < uniqueDates.length; i++) {
           cursor.setDate(cursor.getDate() - 1);
-          if (uniqueDates[i] === cursor.toISOString().split("T")[0]) {
+          const cursorStr = cursor.toISOString().split("T")[0];
+          if (uniqueDates[i] === cursorStr) {
             currentStreak++;
           } else break;
         }
@@ -87,7 +101,8 @@ exports.getTrackerStats = async (req, res, next) => {
       for (let i = 1; i < uniqueDates.length; i++) {
         let prev = new Date(cursor);
         prev.setDate(prev.getDate() - 1);
-        if (uniqueDates[i] === prev.toISOString().split("T")[0]) {
+        const prevStr = prev.toISOString().split("T")[0];
+        if (uniqueDates[i] === prevStr) {
           tempStreak++;
           cursor = new Date(uniqueDates[i]);
         } else {
@@ -99,30 +114,37 @@ exports.getTrackerStats = async (req, res, next) => {
       if (tempStreak > longestStreak) longestStreak = tempStreak;
     }
 
-    // Generate AI Feedback for the primary platform (priority: LeetCode > Codeforces > CodeChef)
-    let aiFeedback = null;
-    try {
-      if (leetcodeStats) {
-        const feedback = await analyzeCodingStats({ platform: "LeetCode", stats: leetcodeStats });
-        aiFeedback = feedback.raw;
-      } else if (codeforcesStats) {
-        const feedback = await analyzeCodingStats({ platform: "Codeforces", stats: codeforcesStats });
-        aiFeedback = feedback.raw;
-      } else if (codechefStats) {
-        const feedback = await analyzeCodingStats({ platform: "CodeChef", stats: codechefStats });
-        aiFeedback = feedback.raw;
+    // AI Feedback - Only update if it's older than 24 hours to save time/cost
+    let aiFeedback = user.codingAiFeedback;
+    const feedbackAge = user.codingAiFeedbackUpdatedAt ? (Date.now() - new Date(user.codingAiFeedbackUpdatedAt).getTime()) : Infinity;
+    
+    if (feedbackAge > 24 * 60 * 60 * 1000) {
+      // Fetch in background or wait a bit? 
+      // For now, let's keep it but optimized
+      try {
+        let bestStats = leetcodeStats || codeforcesStats || codechefStats || gfgStats;
+        if (bestStats) {
+          const feedback = await analyzeCodingStats({ platform: bestStats.platform, stats: bestStats });
+          aiFeedback = feedback.raw;
+          user.codingAiFeedback = aiFeedback;
+          user.codingAiFeedbackUpdatedAt = new Date();
+          await user.save();
+        }
+      } catch (aiErr) {
+        console.error("AI Feedback generation failed:", aiErr.message);
       }
-    } catch (aiErr) {
-      console.error("AI Feedback generation failed:", aiErr.message);
     }
 
     res.status(200).json({
       ok: true,
       profiles,
+      strategy: user.codingStrategy || "",
       stats: {
         leetcode: leetcodeStats,
         codeforces: codeforcesStats,
         codechef: codechefStats,
+        gfg: gfgStats,
+        codingninjas: cnStats,
         tuf: profiles.tuf ? { platform: "tuf", link: profiles.tuf } : null
       },
       currentStreak,
@@ -141,7 +163,10 @@ exports.getTodayActivity = async (req, res, next) => {
 
     const activityByPlatform = {};
     todayActivities.forEach(a => {
-      activityByPlatform[a.platform] = true;
+      activityByPlatform[a.platform] = {
+        solved: a.solved,
+        count: a.problemsCount || 0
+      };
     });
 
     res.status(200).json({ ok: true, activityToday: activityByPlatform });
@@ -153,7 +178,8 @@ exports.getTodayActivity = async (req, res, next) => {
 exports.markProblemSolved = async (req, res, next) => {
   try {
     const { platform } = req.body;
-    if (!["leetcode", "codeforces", "codechef", "tuf"].includes(platform)) {
+    const allowedPlatforms = ["leetcode", "codeforces", "codechef", "tuf", "gfg", "codingninjas"];
+    if (!allowedPlatforms.includes(platform)) {
       return res.status(400).json({ ok: false, error: "Invalid platform" });
     }
 
@@ -175,7 +201,6 @@ exports.markProblemSolved = async (req, res, next) => {
         platform,
         problemsCount: activity.problemsCount
       });
-      // also emit onlineUsers if needed, but handled by base socket usually
     }
 
     res.status(200).json({ ok: true, activity });

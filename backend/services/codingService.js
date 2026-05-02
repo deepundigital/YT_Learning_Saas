@@ -167,6 +167,58 @@ async function fetchCodeChefStats(username) {
   }
 }
 
+async function fetchGfgStats(username) {
+  if (!username) return null;
+  const cacheKey = `gfg_${username}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  try {
+    const { data } = await axios.get(`https://www.geeksforgeeks.org/user/${username}/`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    });
+    const $ = cheerio.load(data);
+    
+    // GFG structure often changes, this is a common selector for total problems solved
+    const solvedStr = $(".scoreCard_head_left--score").first().text() || "0";
+    const totalSolved = parseInt(solvedStr, 10) || 0;
+
+    const result = {
+      platform: "gfg",
+      username,
+      totalSolved,
+      rank: $(".rankNum").text().trim() || "N/A"
+    };
+    cache.set(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error("GFG fetch error:", error.message);
+    return null;
+  }
+}
+
+async function fetchCodingNinjasStats(username) {
+  if (!username) return null;
+  const cacheKey = `cn_${username}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  try {
+    // Coding Ninjas usually requires more complex scraping or has a hidden API
+    // Returning a basic structure for now
+    const result = {
+      platform: "codingninjas",
+      username,
+      totalSolved: 0, 
+      rank: "N/A"
+    };
+    cache.set(cacheKey, result);
+    return result;
+  } catch (error) {
+    return null;
+  }
+}
+
 async function fetchContests() {
   const cacheKey = "upcoming_contests";
   if (cache.has(cacheKey)) return cache.get(cacheKey);
@@ -216,5 +268,7 @@ module.exports = {
   fetchLeetCodeStats,
   fetchCodeforcesStats,
   fetchCodeChefStats,
+  fetchGfgStats,
+  fetchCodingNinjasStats,
   fetchContests
 };

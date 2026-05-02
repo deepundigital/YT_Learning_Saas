@@ -42,3 +42,8 @@ export async function markProblemSolved(platform) {
   const { data } = await api.post("/coding/solve", { platform });
   return data;
 }
+
+export async function updateCodingStrategy(strategy) {
+  const { data } = await api.post("/coding/tracker/strategy", { strategy });
+  return data;
+}

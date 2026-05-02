@@ -101,7 +101,10 @@ const userSchema = new mongoose.Schema(
     leetcode: { type: String, default: "" },
     codeforces: { type: String, default: "" },
     codechef: { type: String, default: "" },
+    gfg: { type: String, default: "" },
+    codingninjas: { type: String, default: "" },
     tuf: { type: String, default: "" },
+    codingStrategy: { type: String, default: "" },
     codingAiFeedback: { type: String, default: "" },
     codingAiFeedbackUpdatedAt: { type: Date, default: null },
     lastLoginAt: {

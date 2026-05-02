@@ -14,7 +14,7 @@ const codingActivitySchema = new mongoose.Schema({
   platform: {
     type: String,
     required: true,
-    enum: ["leetcode", "codeforces", "codechef", "tuf"]
+    enum: ["leetcode", "codeforces", "codechef", "tuf", "gfg", "codingninjas"]
   },
   solved: {
     type: Boolean,

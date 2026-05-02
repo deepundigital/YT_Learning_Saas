@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
 import {
   Code2,
@@ -13,7 +13,11 @@ import {
   ExternalLink,
   Save,
   Clock,
-  Settings
+  Settings,
+  PlusCircle,
+  TrendingUp,
+  ChevronRight,
+  Zap
 } from "lucide-react";
 import Button from "../components/common/Button";
 import {
@@ -22,19 +26,22 @@ import {
   markProblemSolved,
   getSocialLeaderboard,
   getUpcomingContests,
-  getTodayActivity
+  getTodayActivity,
+  updateCodingStrategy
 } from "../services/codingService";
 
 const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 export default function CodingDashboardPage() {
-  const [activeTab, setActiveTab] = useState("stats"); // 'stats', 'social', 'contests'
+  const [activeTab, setActiveTab] = useState("stats"); // 'stats', 'strategy', 'social', 'contests'
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Stats State
-  const [profiles, setProfiles] = useState({ leetcode: "", codeforces: "", codechef: "", tuf: "" });
-  const [stats, setStats] = useState({ leetcode: null, codeforces: null, codechef: null, tuf: null });
+  const [profiles, setProfiles] = useState({ leetcode: "", codeforces: "", codechef: "", gfg: "", codingninjas: "", tuf: "" });
+  const [stats, setStats] = useState({ leetcode: null, codeforces: null, codechef: null, gfg: null, codingninjas: null, tuf: null });
+  const [strategy, setStrategy] = useState("");
   const [aiFeedback, setAiFeedback] = useState(null);
   const [activityToday, setActivityToday] = useState({});
   const [currentStreak, setCurrentStreak] = useState(0);
@@ -64,15 +71,17 @@ export default function CodingDashboardPage() {
         fetchSocialLeaderboard();
       }
       if (data.userId === currentUser._id) {
-        setActivityToday(prev => ({...prev, [data.platform]: true}));
+        setActivityToday(prev => ({...prev, [data.platform]: { solved: true, count: data.problemsCount }}));
       }
     });
 
     return () => socket.disconnect();
   };
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    
     try {
       await Promise.all([
         fetchStats(),
@@ -84,6 +93,7 @@ export default function CodingDashboardPage() {
       console.error("Failed to load dashboard data", err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -100,8 +110,9 @@ export default function CodingDashboardPage() {
     try {
       const res = await getCodingDashboardStats();
       if (res.ok) {
-        setProfiles(res.profiles || { leetcode: "", codeforces: "", codechef: "", tuf: "" });
+        setProfiles(res.profiles || { leetcode: "", codeforces: "", codechef: "", gfg: "", codingninjas: "", tuf: "" });
         setStats(res.stats || {});
+        setStrategy(res.strategy || "");
         setAiFeedback(res.aiFeedback || null);
         setCurrentStreak(res.currentStreak || 0);
         setLongestStreak(res.longestStreak || 0);
@@ -135,18 +146,27 @@ export default function CodingDashboardPage() {
 
   const handleSaveProfiles = async () => {
     try {
+      setRefreshing(true);
       await updateCodingProfiles(profiles);
-      await fetchStats(); // Refresh stats with new usernames
+      await fetchStats(); 
       alert("Profiles saved successfully!");
     } catch (err) {
-      if (err.response?.status === 401) {
-        window.location.href = "/login";
-      } else if (err.response?.status === 404) {
-        alert("User not found. Please log in again.");
-      } else {
-        alert("Failed to save profiles.");
-      }
-      console.error("Failed to save profiles", err);
+      alert("Failed to save profiles.");
+      console.error(err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleSaveStrategy = async () => {
+    try {
+      setRefreshing(true);
+      await updateCodingStrategy(strategy);
+      alert("Strategy saved!");
+    } catch (err) {
+      alert("Failed to save strategy.");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -161,8 +181,32 @@ export default function CodingDashboardPage() {
     }
   };
 
+  const getPlatformLink = (platform, username) => {
+    if (!username) return "#";
+    switch(platform) {
+      case 'leetcode': return `https://leetcode.com/${username}`;
+      case 'codeforces': return `https://codeforces.com/profile/${username}`;
+      case 'codechef': return `https://www.codechef.com/users/${username}`;
+      case 'gfg': return `https://www.geeksforgeeks.org/user/${username}/`;
+      case 'codingninjas': return `https://www.naukri.com/code360/profile/${username}`;
+      default: return "#";
+    }
+  };
+
   const renderStats = () => (
     <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <TrendingUp className="text-blue-400" size={24} /> Performance Overview
+        </h2>
+        <button 
+          onClick={() => loadData(true)} 
+          className={`text-xs flex items-center gap-1 text-muted hover:text-white transition ${refreshing ? 'animate-pulse' : ''}`}
+        >
+          <Zap size={14} /> {refreshing ? "Refreshing..." : "Sync Now"}
+        </button>
+      </div>
+
       {aiFeedback && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
@@ -185,126 +229,287 @@ export default function CodingDashboardPage() {
         </motion.div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
-      {/* Profile Settings */}
-      <div className="glass premium-border rounded-[2rem] p-6">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Settings size={20} className="text-muted" /> Connection Settings
-        </h3>
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs text-muted uppercase tracking-wider font-bold mb-1 block">LeetCode Username</label>
-            <input 
-              value={profiles.leetcode || ""} 
-              onChange={e => setProfiles({...profiles, leetcode: e.target.value})}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm outline-none focus:border-blue-500/50"
-              placeholder="e.g. neetcode"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted uppercase tracking-wider font-bold mb-1 block">Codeforces Handle</label>
-            <input 
-              value={profiles.codeforces || ""} 
-              onChange={e => setProfiles({...profiles, codeforces: e.target.value})}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm outline-none focus:border-blue-500/50"
-              placeholder="e.g. tourist"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted uppercase tracking-wider font-bold mb-1 block">CodeChef Username</label>
-            <input 
-              value={profiles.codechef || ""} 
-              onChange={e => setProfiles({...profiles, codechef: e.target.value})}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm outline-none focus:border-blue-500/50"
-              placeholder="e.g. codechef_user"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted uppercase tracking-wider font-bold mb-1 block">TUF Profile Link</label>
-            <input 
-              value={profiles.tuf || ""} 
-              onChange={e => setProfiles({...profiles, tuf: e.target.value})}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm outline-none focus:border-blue-500/50"
-              placeholder="https://takeuforward.org/profile/..."
-            />
-          </div>
-          <Button onClick={handleSaveProfiles} className="w-full mt-2">
-            <Save size={16} className="mr-2" /> Save & Sync
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid gap-4">
-        {/* Streak Stats (New) */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="glass premium-border rounded-[1.5rem] p-5 flex flex-col items-center text-center">
-            <Flame className="text-orange-400 mb-2" size={24} />
-            <p className="text-xs text-muted uppercase tracking-wider font-bold">Current Streak</p>
-            <h4 className="text-3xl font-black">{currentStreak} <span className="text-sm font-normal text-muted">days</span></h4>
-          </div>
-          <div className="glass premium-border rounded-[1.5rem] p-5 flex flex-col items-center text-center">
-            <Trophy className="text-blue-400 mb-2" size={24} />
-            <p className="text-xs text-muted uppercase tracking-wider font-bold">Longest Streak</p>
-            <h4 className="text-3xl font-black">{longestStreak} <span className="text-sm font-normal text-muted">days</span></h4>
-          </div>
-        </div>
-
-        {/* LeetCode Card */}
-        <div className="glass premium-border rounded-[1.5rem] p-5">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <p className="text-sm font-bold text-yellow-500 mb-1">LeetCode</p>
-              <h4 className="text-2xl font-black">{stats.leetcode?.totalSolved || 0} <span className="text-sm font-normal text-muted">solved</span></h4>
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Profile Settings */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="glass premium-border rounded-[2rem] p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Settings size={20} className="text-muted" /> Connected Accounts
+            </h3>
+            <div className="space-y-4">
+              {[
+                { id: 'leetcode', label: 'LeetCode', placeholder: 'username' },
+                { id: 'codeforces', label: 'Codeforces', placeholder: 'handle' },
+                { id: 'codechef', label: 'CodeChef', placeholder: 'username' },
+                { id: 'gfg', label: 'GeeksforGeeks', placeholder: 'username' },
+                { id: 'codingninjas', label: 'Coding Ninjas', placeholder: 'handle' },
+                { id: 'tuf', label: 'TUF Profile', placeholder: 'profile link' }
+              ].map(p => (
+                <div key={p.id}>
+                  <label className="text-[10px] text-muted uppercase tracking-wider font-bold mb-1 block">{p.label}</label>
+                  <input 
+                    value={profiles[p.id] || ""} 
+                    onChange={e => setProfiles({...profiles, [p.id]: e.target.value})}
+                    className="w-full rounded-xl border border-white/5 bg-black/40 px-4 py-2 text-sm outline-none focus:border-blue-500/50 transition"
+                    placeholder={p.placeholder}
+                  />
+                </div>
+              ))}
+              <Button onClick={handleSaveProfiles} className="w-full mt-2" loading={refreshing}>
+                <Save size={16} className="mr-2" /> Save & Sync
+              </Button>
             </div>
-            {activityToday.leetcode ? (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle2 size={12}/> Active Today</span>
-            ) : (
-              <button onClick={() => handleMarkSolved('leetcode')} className="flex items-center gap-1 text-xs text-muted hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded-full transition">Mark Solved</button>
-            )}
           </div>
-          <div className="flex gap-4 text-xs">
-            <div className="text-emerald-400">Easy: {stats.leetcode?.easySolved || 0}</div>
-            <div className="text-yellow-400">Med: {stats.leetcode?.mediumSolved || 0}</div>
-            <div className="text-red-400">Hard: {stats.leetcode?.hardSolved || 0}</div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="glass premium-border rounded-[1.5rem] p-5 flex flex-col items-center text-center">
+              <Flame className="text-orange-400 mb-2" size={24} />
+              <p className="text-[10px] text-muted uppercase tracking-wider font-bold">Current Streak</p>
+              <h4 className="text-3xl font-black">{currentStreak} <span className="text-xs font-normal text-muted">days</span></h4>
+            </div>
+            <div className="glass premium-border rounded-[1.5rem] p-5 flex flex-col items-center text-center">
+              <Trophy className="text-blue-400 mb-2" size={24} />
+              <p className="text-[10px] text-muted uppercase tracking-wider font-bold">Longest Streak</p>
+              <h4 className="text-3xl font-black">{longestStreak} <span className="text-xs font-normal text-muted">days</span></h4>
+            </div>
           </div>
         </div>
 
-        {/* Codeforces Card */}
-        <div className="glass premium-border rounded-[1.5rem] p-5">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <p className="text-sm font-bold text-blue-500 mb-1">Codeforces</p>
-              <h4 className="text-2xl font-black">{stats.codeforces?.rating || "N/A"} <span className="text-sm font-normal text-muted">rating</span></h4>
+        {/* Stats Cards */}
+        <div className="lg:col-span-2 grid gap-4 sm:grid-cols-2">
+          {/* LeetCode Card */}
+          <div className="glass premium-border rounded-[1.5rem] p-6 group hover:bg-white/[0.02] transition">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <p className="text-sm font-bold text-yellow-500 mb-1">LeetCode</p>
+                <div className="flex items-baseline gap-2">
+                  <h4 className="text-3xl font-black">{stats.leetcode?.totalSolved || 0}</h4>
+                  <span className="text-sm text-muted">solved</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {activityToday.leetcode?.solved ? (
+                  <span className="flex flex-col items-end gap-1">
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle2 size={10}/> ACTIVE</span>
+                    <span className="text-[10px] text-muted font-bold">{activityToday.leetcode.count} solved today</span>
+                  </span>
+                ) : (
+                  <button onClick={() => handleMarkSolved('leetcode')} className="text-[10px] font-bold text-muted hover:text-white bg-white/5 px-2 py-1 rounded-full transition">MARK SOLVED</button>
+                )}
+                {profiles.leetcode && (
+                  <a href={getPlatformLink('leetcode', profiles.leetcode)} target="_blank" rel="noreferrer" className="text-muted hover:text-blue-400 transition">
+                    <ExternalLink size={16} />
+                  </a>
+                )}
+              </div>
             </div>
-            {activityToday.codeforces ? (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle2 size={12}/> Active Today</span>
-            ) : (
-              <button onClick={() => handleMarkSolved('codeforces')} className="flex items-center gap-1 text-xs text-muted hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded-full transition">Mark Solved</button>
-            )}
+            <div className="flex gap-4 text-[10px] font-bold">
+              <div className="text-emerald-400 bg-emerald-400/5 px-2 py-1 rounded-lg">EASY: {stats.leetcode?.easySolved || 0}</div>
+              <div className="text-yellow-400 bg-yellow-400/5 px-2 py-1 rounded-lg">MED: {stats.leetcode?.mediumSolved || 0}</div>
+              <div className="text-red-400 bg-red-400/5 px-2 py-1 rounded-lg">HARD: {stats.leetcode?.hardSolved || 0}</div>
+            </div>
           </div>
-          <div className="text-xs text-muted">Max Rating: {stats.codeforces?.maxRating || 0} • Rank: {stats.codeforces?.rank || "unrated"}</div>
-        </div>
 
-        {/* CodeChef Card */}
-        <div className="glass premium-border rounded-[1.5rem] p-5">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <p className="text-sm font-bold text-rose-500 mb-1">CodeChef</p>
-              <h4 className="text-2xl font-black">{stats.codechef?.rating || "N/A"} <span className="text-sm font-normal text-muted">rating</span></h4>
+          {/* Codeforces Card */}
+          <div className="glass premium-border rounded-[1.5rem] p-6 group hover:bg-white/[0.02] transition">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <p className="text-sm font-bold text-blue-500 mb-1">Codeforces</p>
+                <div className="flex items-baseline gap-2">
+                  <h4 className="text-3xl font-black">{stats.codeforces?.rating || "N/A"}</h4>
+                  <span className="text-sm text-muted">rating</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {activityToday.codeforces?.solved ? (
+                  <span className="flex flex-col items-end gap-1">
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle2 size={10}/> ACTIVE</span>
+                    <span className="text-[10px] text-muted font-bold">{activityToday.codeforces.count} solved today</span>
+                  </span>
+                ) : (
+                  <button onClick={() => handleMarkSolved('codeforces')} className="text-[10px] font-bold text-muted hover:text-white bg-white/5 px-2 py-1 rounded-full transition">MARK SOLVED</button>
+                )}
+                {profiles.codeforces && (
+                  <a href={getPlatformLink('codeforces', profiles.codeforces)} target="_blank" rel="noreferrer" className="text-muted hover:text-blue-400 transition">
+                    <ExternalLink size={16} />
+                  </a>
+                )}
+              </div>
             </div>
-            {activityToday.codechef ? (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle2 size={12}/> Active Today</span>
-            ) : (
-              <button onClick={() => handleMarkSolved('codechef')} className="flex items-center gap-1 text-xs text-muted hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded-full transition">Mark Solved</button>
-            )}
+            <div className="text-[10px] font-bold text-muted flex gap-3">
+              <span>MAX: <span className="text-white">{stats.codeforces?.maxRating || 0}</span></span>
+              <span>RANK: <span className="text-white uppercase">{stats.codeforces?.rank || "unrated"}</span></span>
+            </div>
           </div>
-          <div className="text-xs text-muted">Stars: {stats.codechef?.stars || "None"} • Max Rating: {stats.codechef?.highestRating || 0}</div>
+
+          {/* GFG Card */}
+          <div className="glass premium-border rounded-[1.5rem] p-6 group hover:bg-white/[0.02] transition">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <p className="text-sm font-bold text-emerald-500 mb-1">GeeksforGeeks</p>
+                <div className="flex items-baseline gap-2">
+                  <h4 className="text-3xl font-black">{stats.gfg?.totalSolved || 0}</h4>
+                  <span className="text-sm text-muted">solved</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {activityToday.gfg?.solved ? (
+                  <span className="flex flex-col items-end gap-1">
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle2 size={10}/> ACTIVE</span>
+                    <span className="text-[10px] text-muted font-bold">{activityToday.gfg.count} solved today</span>
+                  </span>
+                ) : (
+                  <button onClick={() => handleMarkSolved('gfg')} className="text-[10px] font-bold text-muted hover:text-white bg-white/5 px-2 py-1 rounded-full transition">MARK SOLVED</button>
+                )}
+                {profiles.gfg && (
+                  <a href={getPlatformLink('gfg', profiles.gfg)} target="_blank" rel="noreferrer" className="text-muted hover:text-blue-400 transition">
+                    <ExternalLink size={16} />
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="text-[10px] font-bold text-muted">
+              INSTITUTE RANK: <span className="text-white">{stats.gfg?.rank || "N/A"}</span>
+            </div>
+          </div>
+
+          {/* CodeChef Card */}
+          <div className="glass premium-border rounded-[1.5rem] p-6 group hover:bg-white/[0.02] transition">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <p className="text-sm font-bold text-rose-500 mb-1">CodeChef</p>
+                <div className="flex items-baseline gap-2">
+                  <h4 className="text-3xl font-black">{stats.codechef?.rating || "N/A"}</h4>
+                  <span className="text-sm text-muted">rating</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {activityToday.codechef?.solved ? (
+                  <span className="flex flex-col items-end gap-1">
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle2 size={10}/> ACTIVE</span>
+                    <span className="text-[10px] text-muted font-bold">{activityToday.codechef.count} solved today</span>
+                  </span>
+                ) : (
+                  <button onClick={() => handleMarkSolved('codechef')} className="text-[10px] font-bold text-muted hover:text-white bg-white/5 px-2 py-1 rounded-full transition">MARK SOLVED</button>
+                )}
+                {profiles.codechef && (
+                  <a href={getPlatformLink('codechef', profiles.codechef)} target="_blank" rel="noreferrer" className="text-muted hover:text-blue-400 transition">
+                    <ExternalLink size={16} />
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="text-[10px] font-bold text-muted flex gap-3">
+              <span className="text-rose-400">{stats.codechef?.stars || "1★"}</span>
+              <span>MAX: <span className="text-white">{stats.codechef?.highestRating || 0}</span></span>
+            </div>
+          </div>
+
+          {/* Coding Ninjas Card */}
+          <div className="glass premium-border rounded-[1.5rem] p-6 group hover:bg-white/[0.02] transition">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <p className="text-sm font-bold text-orange-500 mb-1">Coding Ninjas</p>
+                <div className="flex items-baseline gap-2">
+                  <h4 className="text-3xl font-black">{stats.codingninjas?.totalSolved || 0}</h4>
+                  <span className="text-sm text-muted">solved</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {activityToday.codingninjas?.solved ? (
+                  <span className="flex flex-col items-end gap-1">
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle2 size={10}/> ACTIVE</span>
+                    <span className="text-[10px] text-muted font-bold">{activityToday.codingninjas.count} solved today</span>
+                  </span>
+                ) : (
+                  <button onClick={() => handleMarkSolved('codingninjas')} className="text-[10px] font-bold text-muted hover:text-white bg-white/5 px-2 py-1 rounded-full transition">MARK SOLVED</button>
+                )}
+                {profiles.codingninjas && (
+                  <a href={getPlatformLink('codingninjas', profiles.codingninjas)} target="_blank" rel="noreferrer" className="text-muted hover:text-blue-400 transition">
+                    <ExternalLink size={16} />
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="text-[10px] font-bold text-muted">
+               RANK: <span className="text-white uppercase">{stats.codingninjas?.rank || "N/A"}</span>
+            </div>
+          </div>
+
+          {/* Custom Platform / TUF */}
+          <div className="glass premium-border rounded-[1.5rem] p-6 border-dashed border-white/10 flex flex-col items-center justify-center text-center opacity-80 hover:opacity-100 transition">
+            <PlusCircle className="text-muted mb-2" size={32} />
+            <p className="text-xs font-bold text-muted uppercase">Add More Profiles</p>
+            <p className="text-[10px] text-muted mt-1">Connect your other coding handles above</p>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+
+  const renderStrategy = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <Target className="text-rose-400" size={24} /> Coding Strategy Planner
+        </h2>
+        <Button onClick={handleSaveStrategy} size="sm" loading={refreshing}>
+          <Save size={16} className="mr-2" /> Save Strategy
+        </Button>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="md:col-span-2">
+          <div className="glass premium-border rounded-[2rem] p-1 overflow-hidden h-[500px] flex flex-col">
+            <textarea 
+              value={strategy}
+              onChange={e => setStrategy(e.target.value)}
+              placeholder="Draft your coding roadmap here... 
+Example:
+- Solve 2 LeetCode Mediums daily
+- Complete Binary Search on TUF
+- Participte in Saturday Biweekly contest
+- Review GFG articles on DP"
+              className="flex-1 bg-transparent p-8 text-lg outline-none resize-none font-medium leading-relaxed"
+            />
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="glass premium-border rounded-[2rem] p-6 bg-rose-500/5">
+            <h4 className="font-bold mb-4 text-rose-400 flex items-center gap-2">
+              <Target size={18} /> Daily Goal
+            </h4>
+            <div className="space-y-3">
+              {['leetcode', 'gfg', 'codeforces'].map(p => (
+                <div key={p} className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5">
+                  <span className="text-xs font-bold uppercase">{p}</span>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={activityToday[p]?.solved} readOnly className="rounded border-white/10 bg-black/40" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="glass premium-border rounded-[2rem] p-6">
+            <h4 className="font-bold mb-2 flex items-center gap-2">
+              <ChevronRight size={18} className="text-blue-400" /> Quick Links
+            </h4>
+            <div className="grid grid-cols-1 gap-2">
+              <a href="https://takeuforward.org/strivers-a2z-dsa-course/strivers-a2z-dsa-course-sheet-2nd-edition/" target="_blank" rel="noreferrer" className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium transition flex items-center justify-between">
+                Striver A2Z Sheet <ExternalLink size={12} />
+              </a>
+              <a href="https://leetcode.com/problemset/all/" target="_blank" rel="noreferrer" className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium transition flex items-center justify-between">
+                LeetCode Problems <ExternalLink size={12} />
+              </a>
+              <a href="https://www.geeksforgeeks.org/explore?page=1&sortBy=submissions&itm_source=geeksforgeeks&itm_medium=main_header&itm_campaign=practice_header" target="_blank" rel="noreferrer" className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium transition flex items-center justify-between">
+                GFG Practice <ExternalLink size={12} />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderSocial = () => (
     <div className="glass premium-border rounded-[2rem] p-6 lg:p-10">
@@ -411,47 +616,48 @@ export default function CodingDashboardPage() {
       <div className="section-container py-6 md:py-8">
         <div className="mb-8">
           <p className="text-sm text-muted font-semibold tracking-wider uppercase mb-1">Developer Hub</p>
-          <h1 className="text-3xl font-black md:text-4xl">Coding Tracker</h1>
-          <p className="text-muted mt-2">Connect your profiles, track daily progress, and compete with friends.</p>
+          <h1 className="text-3xl font-black md:text-4xl">Coding Dashboard</h1>
+          <p className="text-muted mt-2">Connect your profiles, plan your strategy, and track daily progress across all major platforms.</p>
         </div>
 
         {/* Custom Tabs */}
         <div className="flex flex-wrap gap-2 mb-8 p-1 rounded-2xl bg-white/5 border border-white/5 w-fit">
-          <button 
-            onClick={() => setActiveTab('stats')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition ${activeTab === 'stats' ? 'bg-white/10 text-white shadow-lg' : 'text-muted hover:text-white hover:bg-white/5'}`}
-          >
-            My Stats
-          </button>
-          <button 
-            onClick={() => setActiveTab('social')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition ${activeTab === 'social' ? 'bg-white/10 text-white shadow-lg' : 'text-muted hover:text-white hover:bg-white/5'}`}
-          >
-            Leaderboard
-          </button>
-          <button 
-            onClick={() => setActiveTab('contests')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition ${activeTab === 'contests' ? 'bg-white/10 text-white shadow-lg' : 'text-muted hover:text-white hover:bg-white/5'}`}
-          >
-            Contests
-          </button>
+          {[
+            { id: 'stats', label: 'My Stats', icon: TrendingUp },
+            { id: 'strategy', label: 'Strategy Planner', icon: Target },
+            { id: 'social', label: 'Leaderboard', icon: Trophy },
+            { id: 'contests', label: 'Contests', icon: Calendar }
+          ].map(tab => (
+            <button 
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 ${activeTab === tab.id ? 'bg-white/10 text-white shadow-lg' : 'text-muted hover:text-white hover:bg-white/5'}`}
+            >
+              <tab.icon size={16} /> {tab.label}
+            </button>
+          ))}
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-10 h-10 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+            <p className="text-muted text-sm font-medium">Syncing with coding platforms...</p>
           </div>
         ) : (
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {activeTab === 'stats' && renderStats()}
-            {activeTab === 'social' && renderSocial()}
-            {activeTab === 'contests' && renderContests()}
-          </motion.div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === 'stats' && renderStats()}
+              {activeTab === 'strategy' && renderStrategy()}
+              {activeTab === 'social' && renderSocial()}
+              {activeTab === 'contests' && renderContests()}
+            </motion.div>
+          </AnimatePresence>
         )}
       </div>
     </div>
